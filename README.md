@@ -32,11 +32,11 @@ Download and open the notebooks with Jupyter or Google Colab. The notebook with 
 
 For example, to run the `basic_distributed_classifier.py`:
 
-1st shell command should look like this: `python3 basic_distributed_classifier.py --job_name=ps --task_index=0`
+* 1st shell command should look like this: `python3 basic_distributed_classifier.py --job_name=ps --task_index=0`
 
-2nd shell: `python3 basic_distributed_classifier.py --job_name=worker --task_index=0`
+* 2nd shell: `python3 basic_distributed_classifier.py --job_name=worker --task_index=0`
 
-3rd shell: `python3 basic_distributed_classifier.py --job_name=worker --task_index=1`
+* 3rd shell: `python3 basic_distributed_classifier.py --job_name=worker --task_index=1`
 
 Follow the same steps for the `basic_federated_classifier.py`, `advanced_distributed_classifier.py` and `advanced_federated_classifier.py`.
 
