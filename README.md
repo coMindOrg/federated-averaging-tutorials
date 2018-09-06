@@ -1,8 +1,8 @@
 # CoMind: Collaborative Machine Learning
 
-For over a year we have been working in the intersection of machine learning and blockchain. This has led us to do extensive research in distributed machine learning algorithms. Federated averaging has a set of features that makes it perfect to train models in a collaborative way while preserving the privacy of sensitive data. In this reposotory you can learn how to start training ML models in a distributed setup.
+For over a year we have been working in the intersection of machine learning and blockchain. This has led us to do extensive research in distributed machine learning algorithms. Federated averaging has a set of features that makes it perfect to train models in a collaborative way while preserving the privacy of sensitive data. In this repository you can learn how to start training ML models in a distributed setup.
 
-![coMind logo](https://image.ibb.co/fFZfFK/PErugHrw.png)
+<img src="https://raw.githubusercontent.com/coMindOrg/federated-averaging-tutorials/master/images/comindorg_logo.png" alt="drawing" width="300"/>
 
 ## What can you expect to find here.
 
@@ -40,7 +40,7 @@ For example, to run the `basic_distributed_classifier.py`:
 
 Follow the same steps for the `basic_federated_classifier.py`, `advanced_distributed_classifier.py` and `advanced_federated_classifier.py`.
 
-### Colab Notebooks 
+### Colab Notebooks <img height="30px" src="https://raw.githubusercontent.com/coMindOrg/federated-averaging-tutorials/master/images/colab_logo.png" align="left"> 
 
 * [Basic Classifier](https://colab.research.google.com/drive/1hJ6UhELZ9sK3eX2_c-MamjxNt4gzgCis)
 * [Basic Distributed Classifier](https://colab.research.google.com/drive/1ZsSOD_J9aFRL4xACVUw0lau0Bc9IPD-C)
@@ -48,22 +48,19 @@ Follow the same steps for the `basic_federated_classifier.py`, `advanced_distrib
 
 ## Troubleshooting and Help
 
-coMind has public Slack and Telegram channels which are a great place to ask questions and all things related to distributed machine learning.
+coMind has public Slack and Telegram channels which are a great place to ask questions and all things related to federated machine learning.
 
 ## Bugs and Issues
 
 Have a bug or an issue? [Open a new issue](https://github.com/coMindOrg/federated-averaging-tutorials/issues) here on GitHub or join our community in Slack or Telegram.
 
-*[Click here to join the Slack channel!](https://comindorg.slack.com/join/shared_invite/enQtNDMxMzc0NDA5OTEwLWIyZTg5MTg1MTM4NjhiNDM4YTU1OTI1NTgwY2NkNzZjYWY1NmI0ZjIyNWJiMTNkZmRhZDg2Nzc3YTYyNGQzM2I)*
+*[Click here to join the Slack channel!](https://comindorg.slack.com/join/shared_invite/enQtNDMxMzc0NDA5OTEwLWIyZTg5MTg1MTM4NjhiNDM4YTU1OTI1NTgwY2NkNzZjYWY1NmI0ZjIyNWJiMTNkZmRhZDg2Nzc3YTYyNGQzM2I)* <img height="30px" src="https://raw.githubusercontent.com/coMindOrg/federated-averaging-tutorials/master/images/slack_logo.jpg" align="left"> 
 
-*[Click here to join the Telegram channel!](https://t.me/comind)*
+*[Click here to join the Telegram channel!](https://t.me/comind)* <img height="30px" src="https://raw.githubusercontent.com/coMindOrg/federated-averaging-tutorials/master/images/telegram_logo.jpg" align="left"> 
 
 ## About
 
-coMind is an open source project for training privacy-preserving distributed deep learning models. 
+coMind is an open source project for training privacy-preserving federated deep learning models. 
 
 * http://comind.org/
 * [Twitter](https://twitter.com/coMindOrg)
-* [Slack](https://comindorg.slack.com/)
-* [Telegram](https://t.me/comind)
-
