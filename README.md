@@ -16,7 +16,7 @@ In this repository you will find 3 different types of files.
 
 - `federated_averaging_optimizer.py` which is the custom optimizer we have created to implement federated averaging in TensorFlow.
 
-- `basic_classifier.py`, `basic_distributed_classifier.py`, `basic_federated_classifier.py`, `advanced_classifier.py`, `advanced_distributed_classifier.py`, `advanced_federated_classifier.py` which are three basic and three advanced examples on how to train and evaluate a TensorFlow models in a local, distributed and federated way.
+- `basic_classifier.py`, `basic_distributed_classifier.py`, `basic_federated_classifier.py`, `advanced_classifier.py`, `advanced_distributed_classifier.py`, `advanced_federated_classifier.py` which are three basic and three advanced examples on how to train and evaluate TensorFlow models in a local, distributed and federated way.
 
 - `Basic Classifier.ipynb`, `Basic Distributed Classifier.ipynb`, `Basic Federated Classifier.ipynb` which are three IPython Notebooks where you can find the three basic examples named above and in depth documentation to walk you through.
 
@@ -28,7 +28,7 @@ In this repository you will find 3 different types of files.
 
 ## Usage
 
-Download and open the notebooks with Jupyter or Google Colab. The notebook with the local training example `Basic Classifier.ipynb` and the python scripts `basic_classifier.py` and `advanced_classifier.py` can be run riht away. For the others you will need to open three different shells. One of them will be executing the parameter server and the other two the workers.
+Download and open the notebooks with Jupyter or Google Colab. The notebook with the local training example `Basic Classifier.ipynb` and the python scripts `basic_classifier.py` and `advanced_classifier.py` can be run right away. For the others you will need to open three different shells. One of them will be executing the parameter server and the other two the workers.
 
 For example, to run the `basic_distributed_classifier.py`:
 
