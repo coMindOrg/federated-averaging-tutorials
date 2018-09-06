@@ -48,9 +48,9 @@ coMind has public Slack and Telegram channels which are a great place to ask que
 
 Have a bug or an issue? [Open a new issue](https://github.com/coMindOrg/federated-averaging-tutorials/issues) here on GitHub or join our community in Slack or Telegram.
 
-**[Click here to join the Slack channel!](https://comindorg.slack.com/join/shared_invite/enQtNDMxMzc0NDA5OTEwLWIyZTg5MTg1MTM4NjhiNDM4YTU1OTI1NTgwY2NkNzZjYWY1NmI0ZjIyNWJiMTNkZmRhZDg2Nzc3YTYyNGQzM2I)**
+*[Click here to join the Slack channel!](https://comindorg.slack.com/join/shared_invite/enQtNDMxMzc0NDA5OTEwLWIyZTg5MTg1MTM4NjhiNDM4YTU1OTI1NTgwY2NkNzZjYWY1NmI0ZjIyNWJiMTNkZmRhZDg2Nzc3YTYyNGQzM2I)*
 
-**[Click here to join the Telegram channel!](https://t.me/comind)**
+*[Click here to join the Telegram channel!](https://t.me/comind)*
 
 ## About
 
