@@ -1,4 +1,4 @@
-# CoMind: Colaborative Machine Learning
+# CoMind: Collaborative Machine Learning
 
 ![coMind logo](https://image.ibb.co/fFZfFK/PErugHrw.png)
 
