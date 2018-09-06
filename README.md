@@ -40,6 +40,12 @@ For example, to run the `basic_distributed_classifier.py`:
 
 Follow the same steps for the `basic_federated_classifier.py`, `advanced_distributed_classifier.py` and `advanced_federated_classifier.py`.
 
+### Colab Notebooks 
+
+* [Basic Classifier](https://colab.research.google.com/drive/1hJ6UhELZ9sK3eX2_c-MamjxNt4gzgCis)
+* [Basic Distributed Classifier](https://colab.research.google.com/drive/1ZsSOD_J9aFRL4xACVUw0lau0Bc9IPD-C)
+* [Basic Federated Classifier](https://colab.research.google.com/drive/1zMNAJlqnNSziKYECTWhPyj4HSzg1g8sx)
+
 ## Troubleshooting and Help
 
 coMind has public Slack and Telegram channels which are a great place to ask questions and all things related to distributed machine learning.
