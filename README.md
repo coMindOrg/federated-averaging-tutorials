@@ -30,7 +30,7 @@ In this repository you will find 3 different types of files.
 
 Download and open the notebooks with Jupyter or Google Colab. The notebook with the local training example `Basic Classifier.ipynb` and the python scripts `basic_classifier.py` and `advanced_classifier.py` can be run riht away. For the others you will need to open three different shells. One of them will be executing the parameter server and the other two the workers.
 
-To run the basic_distributed_classifier.py:
+For example, to run the `basic_distributed_classifier.py`:
 
 The first shell command should look like this: `python3 basic_distributed_classifier.py --job_name=ps --task_index=0`
 
@@ -38,11 +38,11 @@ the second shell: `python3 basic_distributed_classifier.py --job_name=worker --t
 
 and the third one: `python3 basic_distributed_classifier.py --job_name=worker --task_index=1`
 
-Follow the same steps for the basic_federated_classifier.py, advanced_distributed_classifier.py and advanced_federated_classifier.py.
+Follow the same steps for the `basic_federated_classifier.py`, `advanced_distributed_classifier.py` and `advanced_federated_classifier.py`.
 
 ## Troubleshooting and Help
 
-coMind has a public Slack and Telegram channels which are a great place to ask questions and all things related to distributed machine learning.
+coMind has public Slack and Telegram channels which are a great place to ask questions and all things related to distributed machine learning.
 
 ## Bugs and Issues
 
