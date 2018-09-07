@@ -7,7 +7,7 @@ import os
 import numpy as np
 from time import time
 import matplotlib.pyplot as plt
-import model_average_optimizer
+import federated_averaging_optimizer
 
 flags = tf.app.flags
 flags.DEFINE_integer("task_index", None,
@@ -87,7 +87,7 @@ with tf.name_scope('dataset'):
         result = tf.cond(train_mode, lambda: processed_image, lambda: resized_image)
         return result, label
     images_placeholder = tf.placeholder(train_images.dtype, [None, train_images.shape[1], train_images.shape[2], train_images.shape[3]], name='images_placeholder')
-    labels_placeholder = tf.placeholder(train_labels.dtype, [None, 1], name='labels_placeholder')
+    labels_placeholder = tf.placeholder(train_labels.dtype, [None], name='labels_placeholder')
     batch_size = tf.placeholder(tf.int64, name='batch_size')
     train_mode = tf.placeholder(tf.bool, name='train_mode')
 
@@ -124,6 +124,7 @@ second_relu = tf.layers.dense(first_relu, 192, activation=tf.nn.relu, kernel_ini
 predictions = tf.layers.dense(second_relu, 10, activation=tf.nn.softmax, kernel_initializer=tf.truncated_normal_initializer(stddev=1/192.0), name='softmax')
 
 summary_averages = tf.train.ExponentialMovingAverage(0.9)
+n_batches = int(train_images.shape[0] / BATCH_SIZE)
 
 with tf.name_scope('loss'):
     loss = tf.reduce_mean(keras.losses.sparse_categorical_crossentropy(y, predictions))
@@ -140,14 +141,13 @@ with tf.name_scope('accuracy'):
 with tf.name_scope('train'):
     device_setter = tf.train.replica_device_setter(worker_device=worker_device, cluster=cluster)
     lr = tf.train.exponential_decay(0.1, global_step, n_batches * EPOCHS_PER_DECAY, 0.1, staircase=True)
-    optimizer = model_average_optimizer.ModelAverageOptimizer(tf.train.AdamOptimizer(np.sqrt(num_workers) * lr), replicas_to_aggregate=num_workers, interval_steps=INTERVAL_STEPS, device_setter=device_setter)
+    optimizer = federated_averaging_optimizer.FederatedAveragingOptimizer(tf.train.AdamOptimizer(np.sqrt(num_workers) * lr), replicas_to_aggregate=num_workers, interval_steps=INTERVAL_STEPS, device_setter=device_setter)
     with tf.control_dependencies([loss_averages_op, accuracy_averages_op]):
         train_op = optimizer.minimize(loss, global_step=global_step)
     model_average_hook = optimizer.make_session_run_hook(is_chief=is_chief)
 
 print('Graph definition finished')
 
-n_batches = int(train_images.shape[0] / BATCH_SIZE)
 last_step = int(n_batches * EPOCHS)
 
 sess_config = tf.ConfigProto(

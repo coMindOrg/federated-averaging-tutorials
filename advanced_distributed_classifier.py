@@ -89,7 +89,7 @@ with tf.device(
             result = tf.cond(train_mode, lambda: processed_image, lambda: resized_image)
             return result, label
         images_placeholder = tf.placeholder(train_images.dtype, [None, train_images.shape[1], train_images.shape[2], train_images.shape[3]], name='images_placeholder')
-        labels_placeholder = tf.placeholder(train_labels.dtype, [None, 1], name='labels_placeholder')
+        labels_placeholder = tf.placeholder(train_labels.dtype, [None], name='labels_placeholder')
         batch_size = tf.placeholder(tf.int64, name='batch_size')
         train_mode = tf.placeholder(tf.bool, name='train_mode')
 
@@ -122,6 +122,7 @@ with tf.device(
     predictions = tf.layers.dense(second_relu, 10, activation=tf.nn.softmax, kernel_initializer=tf.truncated_normal_initializer(stddev=1/192.0), name='softmax')
 
     summary_averages = tf.train.ExponentialMovingAverage(0.9)
+    n_batches = int(train_images.shape[0] / (BATCH_SIZE * num_workers))
 
     with tf.name_scope('loss'):
         loss = tf.reduce_mean(keras.losses.sparse_categorical_crossentropy(y, predictions))
@@ -144,7 +145,6 @@ with tf.device(
 
     print('Graph definition finished')
 
-    n_batches = int(train_images.shape[0] / (BATCH_SIZE * num_workers))
     last_step = int(n_batches * EPOCHS)
 
     sess_config = tf.ConfigProto(
