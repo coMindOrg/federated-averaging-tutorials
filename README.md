@@ -56,7 +56,13 @@ Have a bug or an issue? [Open a new issue](https://github.com/coMindOrg/federate
 
 *[Click here to join the Slack channel!](https://comindorg.slack.com/join/shared_invite/enQtNDMxMzc0NDA5OTEwLWIyZTg5MTg1MTM4NjhiNDM4YTU1OTI1NTgwY2NkNzZjYWY1NmI0ZjIyNWJiMTNkZmRhZDg2Nzc3YTYyNGQzM2I)* <img height="30px" src="https://raw.githubusercontent.com/coMindOrg/federated-averaging-tutorials/master/images/slack_logo.jpg" align="left"> 
 
-*[Click here to join the Telegram channel!](https://t.me/comind)* <img height="30px" src="https://raw.githubusercontent.com/coMindOrg/federated-averaging-tutorials/master/images/telegram_logo.jpg" align="left"> 
+*[Click here to join the Telegram channel!](https://t.me/comind)* <img height="30px" src="https://raw.githubusercontent.com/coMindOrg/federated-averaging-tutorials/master/images/telegram_logo.jpg" align="left">
+
+## References
+
+The Federated Averaging algorithm is explained in more detail in the following paper:
+
+H. B. McMahan, E. Moore, D. Ramage, S. Hampson, and B. A. y Arcas. [Communication-efficient learning of deep networks from decentralized data](https://arxiv.org/pdf/1602.05629.pdf). In Conference on Artificial Intelligence and Statistics, 2017.
 
 ## About
 
