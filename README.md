@@ -68,5 +68,5 @@ H. B. McMahan, E. Moore, D. Ramage, S. Hampson, and B. A. y Arcas. [Communicatio
 
 coMind is an open source project for training privacy-preserving federated deep learning models. 
 
-* http://comind.org/
+* https://comind.org/
 * [Twitter](https://twitter.com/coMindOrg)
