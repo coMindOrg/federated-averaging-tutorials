@@ -22,7 +22,7 @@ flags.DEFINE_string("job_name", None, "job name: worker or ps")
 
 BATCH_SIZE = 32
 EPOCHS = 5
-INTERVAL_STEPS = 10
+INTERVAL_STEPS = 100
 
 FLAGS = flags.FLAGS
 
@@ -57,8 +57,8 @@ print('Data loaded')
 class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
                'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
 
-train_images = np.split(train_images, num_workers)[FLAGS.task_index]
-train_labels = np.split(train_labels, num_workers)[FLAGS.task_index]
+train_images = np.array_split(train_images, num_workers)[FLAGS.task_index]
+train_labels = np.array_split(train_labels, num_workers)[FLAGS.task_index]
 print('Local dataset size: {}'.format(train_images.shape[0]))
 
 train_images = train_images / 255.0
@@ -139,7 +139,7 @@ class _LoggerHook(tf.train.SessionRunHook):
       loss_value, acc_value, step_value = run_values.results
       self._total_loss += loss_value
       self._total_acc += acc_value
-      if (step_value + 1) % n_batches == 0 and not step_value == 0:
+      if (step_value + 1) % n_batches == 0:
           print("Epoch {}/{} - loss: {:.4f} - acc: {:.4f}".format(int(step_value / n_batches) + 1, EPOCHS, self._total_loss / n_batches, self._total_acc / n_batches))
           self._total_loss = 0
           self._total_acc = 0

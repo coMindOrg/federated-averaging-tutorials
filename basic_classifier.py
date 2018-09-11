@@ -81,7 +81,7 @@ class _LoggerHook(tf.train.SessionRunHook):
       loss_value, acc_value, step_value = run_values.results
       self._total_loss += loss_value
       self._total_acc += acc_value
-      if (step_value + 1) % n_batches == 0 and not step_value == 0:
+      if (step_value + 1) % n_batches == 0:
           print("Epoch {}/{} - loss: {:.4f} - acc: {:.4f}".format(int(step_value / n_batches) + 1, EPOCHS, self._total_loss / n_batches, self._total_acc / n_batches))
           self._total_loss = 0
           self._total_acc = 0
@@ -104,7 +104,6 @@ with tf.Session() as sess:
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
     tf.train.Saver().restore(sess, ckpt.model_checkpoint_path)
     print('Model restored')
-    graph = tf.get_default_graph()
     sess.run(dataset_init_op, feed_dict={images_placeholder: test_images, labels_placeholder: test_labels, batch_size: test_images.shape[0]})
     print('Test accuracy: {:4f}'.format(sess.run(accuracy)))
     predicted = sess.run(predictions)

@@ -111,7 +111,7 @@ class _LoggerHook(tf.train.SessionRunHook):
       loss_value, acc_value, step_value = run_values.results
       self._total_loss += loss_value
       self._total_acc += acc_value
-      if (step_value + 1) % n_batches == 0 and not step_value == 0:
+      if (step_value + 1) % n_batches == 0:
           print("Epoch {}/{} - loss: {:.4f} - acc: {:.4f}".format(int(step_value / n_batches) + 1, EPOCHS, self._total_loss / n_batches, self._total_acc / n_batches))
           self._total_loss = 0
           self._total_acc = 0
@@ -130,20 +130,10 @@ with tf.name_scope('monitored_session'):
             mon_sess.run(train_op)
 
 print('--- Begin Evaluation ---')
-tf.reset_default_graph()
 with tf.Session() as sess:
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
-    saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path + '.meta', clear_devices=True)
-    saver.restore(sess, ckpt.model_checkpoint_path)
+    tf.train.Saver().restore(sess, ckpt.model_checkpoint_path)
     print('Model restored')
-    graph = tf.get_default_graph()
-    images_placeholder = graph.get_tensor_by_name('dataset/images_placeholder:0')
-    labels_placeholder = graph.get_tensor_by_name('dataset/labels_placeholder:0')
-    batch_size = graph.get_tensor_by_name('dataset/batch_size:0')
-    train_mode = graph.get_tensor_by_name('dataset/train_mode:0')
-    accuracy = graph.get_tensor_by_name('accuracy/accuracy_metric:0')
-    predictions = graph.get_tensor_by_name('softmax/BiasAdd:0')
-    dataset_init_op = graph.get_operation_by_name('dataset/dataset_init')
     sess.run(dataset_init_op, feed_dict={images_placeholder: test_images, labels_placeholder: test_labels, batch_size: test_images.shape[0], train_mode: False})
     print('Test accuracy: {:4f}'.format(sess.run(accuracy)))
     predicted = sess.run(predictions)
