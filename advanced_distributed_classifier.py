@@ -101,7 +101,7 @@ with tf.device(
         dataset_init_op = iterator.make_initializer(dataset, name='dataset_init')
         X, y = iterator.get_next()
 
-    first_conv = tf.layers.conv2d(X, 64, 5, padding='SAME', activation=tf.nn.relu, kernel_initializer=tf.truncated_normal_initializer(stddev=5e-2),name='first_conv')
+    first_conv = tf.layers.conv2d(X, 64, 5, padding='SAME', activation=tf.nn.relu, kernel_initializer=tf.truncated_normal_initializer(stddev=5e-2), name='first_conv')
 
     first_pool = tf.nn.max_pool(first_conv, [1, 3, 3 ,1], [1, 2, 2, 1], padding='SAME', name='first_pool')
 
@@ -125,7 +125,9 @@ with tf.device(
     n_batches = int(train_images.shape[0] / (BATCH_SIZE * num_workers))
 
     with tf.name_scope('loss'):
-        loss = tf.reduce_mean(keras.losses.sparse_categorical_crossentropy(y, predictions))
+        base_loss = tf.reduce_mean(keras.losses.sparse_categorical_crossentropy(y, predictions), name='base_loss')
+        regularizer_loss = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'relu/kernel' in v.name], name='regularizer_loss') * 0.004
+        loss = tf.add(base_loss, regularizer_loss)
         loss_averages_op = summary_averages.apply([loss])
         tf.summary.scalar('cross_entropy', summary_averages.average(loss))
 
@@ -136,10 +138,14 @@ with tf.device(
         accuracy_averages_op = summary_averages.apply([accuracy])
         tf.summary.scalar('accuracy', summary_averages.average(accuracy))
 
+    with tf.name_scope('variable_averages'):
+        variable_averages = tf.train.ExponentialMovingAverage(0.9, global_step)
+        variable_averages_op = variable_averages.apply(tf.trainable_variables())
+
     with tf.name_scope('train'):
         lr = tf.train.exponential_decay(0.1, global_step, n_batches * EPOCHS_PER_DECAY, 0.1, staircase=True)
         optimizer = tf.train.SyncReplicasOptimizer(tf.train.AdamOptimizer(np.sqrt(num_workers) * lr), replicas_to_aggregate=num_workers)
-        with tf.control_dependencies([loss_averages_op, accuracy_averages_op]):
+        with tf.control_dependencies([loss_averages_op, accuracy_averages_op, variable_averages_op]):
             train_op = optimizer.minimize(loss, global_step=global_step)
         sync_replicas_hook = optimizer.make_session_run_hook(is_chief)
 
@@ -184,10 +190,10 @@ with tf.device(
                 master=server.target,
                 is_chief=is_chief,
                 checkpoint_dir=checkpoint_dir,
-                hooks=[_LoggerHook(), _InitHook(), sync_replicas_hook],
+                hooks=[_LoggerHook(), _InitHook(), tf.train.CheckpointSaverHook(checkpoint_dir=checkpoint_dir, save_steps=n_batches, saver=tf.train.Saver(variable_averages.variables_to_restore())), sync_replicas_hook],
                 config=sess_config,
                 stop_grace_period_secs=10,
-                save_checkpoint_steps=n_batches) as mon_sess:
+                save_checkpoint_secs=None) as mon_sess:
             while not mon_sess.should_stop():
                 mon_sess.run(train_op)
 
@@ -221,7 +227,7 @@ if is_chief:
         plt.grid(False)
         plt.imshow(test_images[i], cmap=plt.cm.binary)
         predicted_label = np.argmax(predicted[i])
-        true_label = test_labels[i][0]
+        true_label = test_labels[i]
         if predicted_label == true_label:
           color = 'green'
         else:

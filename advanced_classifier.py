@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 BATCH_SIZE = 128
 EPOCHS = 250
-EPOCHS_PER_DECAY = 50
+EPOCHS_PER_DECAY = 100
 
 cifar10 = keras.datasets.cifar10
 (train_images, train_labels), (test_images, test_labels) = cifar10.load_data()
@@ -52,7 +52,7 @@ with tf.name_scope('dataset'):
     dataset_init_op = iterator.make_initializer(dataset, name='dataset_init')
     X, y = iterator.get_next()
 
-first_conv = tf.layers.conv2d(X, 64, 5, padding='SAME', activation=tf.nn.relu, kernel_initializer=tf.truncated_normal_initializer(stddev=5e-2),name='first_conv')
+first_conv = tf.layers.conv2d(X, 64, 5, padding='SAME', activation=tf.nn.relu, kernel_initializer=tf.truncated_normal_initializer(stddev=5e-2), name='first_conv')
 
 first_pool = tf.nn.max_pool(first_conv, [1, 3, 3 ,1], [1, 2, 2, 1], padding='SAME', name='first_pool')
 
@@ -75,7 +75,9 @@ predictions = tf.layers.dense(second_relu, 10, activation=tf.nn.softmax, kernel_
 summary_averages = tf.train.ExponentialMovingAverage(0.9)
 
 with tf.name_scope('loss'):
-    loss = tf.reduce_mean(keras.losses.sparse_categorical_crossentropy(y, predictions))
+    base_loss = tf.reduce_mean(keras.losses.sparse_categorical_crossentropy(y, predictions), name='base_loss')
+    regularizer_loss = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'relu/kernel' in v.name], name='regularizer_loss') * 0.004
+    loss = tf.add(base_loss, regularizer_loss)
     loss_averages_op = summary_averages.apply([loss])
     tf.summary.scalar('cross_entropy', summary_averages.average(loss))
 
@@ -89,9 +91,13 @@ with tf.name_scope('accuracy'):
 n_batches = int(train_images.shape[0] / BATCH_SIZE)
 last_step = int(n_batches * EPOCHS)
 
+with tf.name_scope('variable_averages'):
+    variable_averages = tf.train.ExponentialMovingAverage(0.9, global_step)
+    variable_averages_op = variable_averages.apply(tf.trainable_variables())
+
 with tf.name_scope('train'):
     lr = tf.train.exponential_decay(0.1, global_step, n_batches * EPOCHS_PER_DECAY, 0.1, staircase=True)
-    with tf.control_dependencies([loss_averages_op, accuracy_averages_op]):
+    with tf.control_dependencies([loss_averages_op, accuracy_averages_op, variable_averages_op]):
         train_op = tf.train.GradientDescentOptimizer(lr).minimize(loss, global_step=global_step)
 
 print('Graph definition finished')
@@ -123,17 +129,28 @@ class _InitHook(tf.train.SessionRunHook):
 with tf.name_scope('monitored_session'):
     with tf.train.MonitoredTrainingSession(
             checkpoint_dir=checkpoint_dir,
-            hooks=[_LoggerHook(), _InitHook()],
+            hooks=[_LoggerHook(), _InitHook(), tf.train.CheckpointSaverHook(checkpoint_dir=checkpoint_dir, save_steps=n_batches, saver=tf.train.Saver(variable_averages.variables_to_restore()))],
             config=sess_config,
-            save_checkpoint_steps=n_batches) as mon_sess:
+            save_checkpoint_secs=None) as mon_sess:
         while not mon_sess.should_stop():
             mon_sess.run(train_op)
 
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 print('--- Begin Evaluation ---')
+tf.reset_default_graph()
 with tf.Session() as sess:
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
-    tf.train.Saver().restore(sess, ckpt.model_checkpoint_path)
+    saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path + '.meta', clear_devices=True)
+    saver.restore(sess, ckpt.model_checkpoint_path)
     print('Model restored')
+    graph = tf.get_default_graph()
+    images_placeholder = graph.get_tensor_by_name('dataset/images_placeholder:0')
+    labels_placeholder = graph.get_tensor_by_name('dataset/labels_placeholder:0')
+    batch_size = graph.get_tensor_by_name('dataset/batch_size:0')
+    train_mode = graph.get_tensor_by_name('dataset/train_mode:0')
+    accuracy = graph.get_tensor_by_name('accuracy/accuracy_metric:0')
+    predictions = graph.get_tensor_by_name('softmax/BiasAdd:0')
+    dataset_init_op = graph.get_operation_by_name('dataset/dataset_init')
     sess.run(dataset_init_op, feed_dict={images_placeholder: test_images, labels_placeholder: test_labels, batch_size: test_images.shape[0], train_mode: False})
     print('Test accuracy: {:4f}'.format(sess.run(accuracy)))
     predicted = sess.run(predictions)
