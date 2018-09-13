@@ -209,7 +209,8 @@ with tf.device(
                 master=server.target,
                 is_chief=is_chief,
                 checkpoint_dir=checkpoint_dir,
-                hooks=[_LoggerHook(), _InitHook(), tf.train.CheckpointSaverHook(checkpoint_dir=checkpoint_dir, save_steps=n_batches, saver=tf.train.Saver(variable_averages.variables_to_restore())), sync_replicas_hook],
+                hooks=[_LoggerHook(), _InitHook(), sync_replicas_hook],
+                chief_only_hooks=[tf.train.CheckpointSaverHook(checkpoint_dir=checkpoint_dir, save_steps=n_batches, saver=tf.train.Saver(variable_averages.variables_to_restore()))],
                 config=sess_config,
                 stop_grace_period_secs=10,
                 save_checkpoint_secs=None) as mon_sess:
