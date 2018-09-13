@@ -40,7 +40,7 @@ flags.DEFINE_string("job_name", None, "job name: worker or ps")
 BATCH_SIZE = 128
 EPOCHS = 250
 EPOCHS_PER_DECAY = 50
-INTERVAL_STEPS = 100
+INTERVAL_STEPS = 50
 
 FLAGS = flags.FLAGS
 
@@ -95,14 +95,15 @@ global_step = tf.train.get_or_create_global_step()
 with tf.name_scope('dataset'):
     def preprocess(image, label):
         casted_image = tf.cast(image, tf.float32, name='input_cast')
+        casted_label = tf.cast(label, tf.int64, name='label_cast')
         resized_image = tf.image.resize_image_with_crop_or_pad(casted_image, 24, 24)
         distorted_image = tf.random_crop(casted_image, [24, 24, 3], name='random_crop')
         distorted_image = tf.image.random_flip_left_right(distorted_image)
         distorted_image = tf.image.random_brightness(distorted_image, 63)
         distorted_image = tf.image.random_contrast(distorted_image, 0.2, 1.8)
-        processed_image = tf.image.per_image_standardization(distorted_image)
-        result = tf.cond(train_mode, lambda: processed_image, lambda: resized_image)
-        return result, label
+        result = tf.cond(train_mode, lambda: distorted_image, lambda: resized_image)
+        processed_image = tf.image.per_image_standardization(result)
+        return processed_image, casted_label
     images_placeholder = tf.placeholder(train_images.dtype, [None, train_images.shape[1], train_images.shape[2], train_images.shape[3]], name='images_placeholder')
     labels_placeholder = tf.placeholder(train_labels.dtype, [None], name='labels_placeholder')
     batch_size = tf.placeholder(tf.int64, name='batch_size')
@@ -138,13 +139,13 @@ first_relu = tf.layers.dense(flatten_layer, 384, activation=tf.nn.relu, kernel_i
 
 second_relu = tf.layers.dense(first_relu, 192, activation=tf.nn.relu, kernel_initializer=tf.truncated_normal_initializer(stddev=0.04), name='second_relu')
 
-predictions = tf.layers.dense(second_relu, 10, activation=tf.nn.softmax, kernel_initializer=tf.truncated_normal_initializer(stddev=1/192.0), name='softmax')
+logits = tf.layers.dense(second_relu, 10, kernel_initializer=tf.truncated_normal_initializer(stddev=1/192.0), name='logits')
 
 summary_averages = tf.train.ExponentialMovingAverage(0.9)
 n_batches = int(train_images.shape[0] / BATCH_SIZE)
 
 with tf.name_scope('loss'):
-    base_loss = tf.reduce_mean(keras.losses.sparse_categorical_crossentropy(y, predictions), name='base_loss')
+    base_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=logits), name='base_loss')
     regularizer_loss = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'relu/kernel' in v.name], name='regularizer_loss') * 0.004
     loss = tf.add(base_loss, regularizer_loss)
     loss_averages_op = summary_averages.apply([loss])
@@ -152,19 +153,20 @@ with tf.name_scope('loss'):
 
 with tf.name_scope('accuracy'):
     with tf.name_scope('correct_prediction'):
-        correct_prediction = tf.equal(tf.argmax(predictions, 1), tf.cast(y, tf.int64))
+        correct_prediction = tf.equal(tf.argmax(predictions, 1), y)
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy_metric')
     accuracy_averages_op = summary_averages.apply([accuracy])
     tf.summary.scalar('accuracy', summary_averages.average(accuracy))
 
 with tf.name_scope('variable_averages'):
-    variable_averages = tf.train.ExponentialMovingAverage(0.9, global_step)
+    variable_averages = tf.train.ExponentialMovingAverage(0.9999, global_step)
     variable_averages_op = variable_averages.apply(tf.trainable_variables())
 
 with tf.name_scope('train'):
     device_setter = tf.train.replica_device_setter(worker_device=worker_device, cluster=cluster)
     lr = tf.train.exponential_decay(0.1, global_step, n_batches * EPOCHS_PER_DECAY, 0.1, staircase=True)
-    optimizer = federated_averaging_optimizer.FederatedAveragingOptimizer(tf.train.AdamOptimizer(np.sqrt(num_workers) * lr), replicas_to_aggregate=num_workers, interval_steps=INTERVAL_STEPS, device_setter=device_setter)
+    tf.summary.scalar('learning_rate', lr)
+    optimizer = federated_averaging_optimizer.FederatedAveragingOptimizer(tf.train.GradientDescentOptimizer(np.sqrt(num_workers) * lr), replicas_to_aggregate=num_workers, interval_steps=INTERVAL_STEPS, device_setter=device_setter)
     with tf.control_dependencies([loss_averages_op, accuracy_averages_op, variable_averages_op]):
         train_op = optimizer.minimize(loss, global_step=global_step)
     model_average_hook = optimizer.make_session_run_hook(is_chief=is_chief)
@@ -244,11 +246,11 @@ if is_chief:
         batch_size = graph.get_tensor_by_name('dataset/batch_size:0')
         train_mode = graph.get_tensor_by_name('dataset/train_mode:0')
         accuracy = graph.get_tensor_by_name('accuracy/accuracy_metric:0')
-        predictions = graph.get_tensor_by_name('softmax/BiasAdd:0')
+        logits = graph.get_tensor_by_name('logits/BiasAdd:0')
         dataset_init_op = graph.get_operation_by_name('dataset/dataset_init')
         sess.run(dataset_init_op, feed_dict={images_placeholder: test_images, labels_placeholder: test_labels, batch_size: test_images.shape[0], train_mode: False})
         print('Test accuracy: {:4f}'.format(sess.run(accuracy)))
-        predicted = sess.run(predictions)
+        predicted = sess.run(logits)
 
     # Plot the first 25 test images, their predicted label, and the true label
     # Color correct predictions in green, incorrect predictions in red
