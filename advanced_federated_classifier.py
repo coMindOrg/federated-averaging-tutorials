@@ -153,7 +153,7 @@ with tf.name_scope('loss'):
 
 with tf.name_scope('accuracy'):
     with tf.name_scope('correct_prediction'):
-        correct_prediction = tf.equal(tf.argmax(predictions, 1), y)
+        correct_prediction = tf.equal(tf.argmax(logits, 1), y)
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy_metric')
     accuracy_averages_op = summary_averages.apply([accuracy])
     tf.summary.scalar('accuracy', summary_averages.average(accuracy))
