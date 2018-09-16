@@ -167,7 +167,7 @@ class FederatedAveragingOptimizer(optimizer.Optimizer):
     self._interval_steps = interval_steps
     self._is_chief = is_chief
     self._total_num_replicas = total_num_replicas
-    self._tokens_per_step = max(total_num_replicas, replicas_to_aggregate)
+    self._tokens_per_step = max(total_num_replicas, replicas_to_aggregate) - 1
     self._device_setter = device_setter
     self._name = name
 
