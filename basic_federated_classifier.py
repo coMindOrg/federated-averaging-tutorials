@@ -83,52 +83,53 @@ test_images = test_images / 255.0
 
 is_chief = (FLAGS.task_index == 0)
 
-checkpoint_dir='logs_dir/{}'.format(time())
+checkpoint_dir='logs_dir/federated_worker_{}/{}'.format(FLAGS.task_index, time())
 print('Checkpoint directory: ' + checkpoint_dir)
 
 worker_device = "/job:worker/task:%d" % FLAGS.task_index
 print('Worker device: ' + worker_device + ' - is_chief: {}'.format(is_chief))
 
-global_step = tf.train.get_or_create_global_step()
+with tf.device(worker_device):
+    global_step = tf.train.get_or_create_global_step()
 
-with tf.name_scope('dataset'):
-    images_placeholder = tf.placeholder(train_images.dtype, [None, train_images.shape[1], train_images.shape[2]], name='images_placeholder')
-    labels_placeholder = tf.placeholder(train_labels.dtype, [None], name='labels_placeholder')
-    batch_size = tf.placeholder(tf.int64, name='batch_size')
+    with tf.name_scope('dataset'):
+        images_placeholder = tf.placeholder(train_images.dtype, [None, train_images.shape[1], train_images.shape[2]], name='images_placeholder')
+        labels_placeholder = tf.placeholder(train_labels.dtype, [None], name='labels_placeholder')
+        batch_size = tf.placeholder(tf.int64, name='batch_size')
 
-    dataset = tf.data.Dataset.from_tensor_slices((images_placeholder, labels_placeholder))
-    dataset = dataset.batch(batch_size)
-    dataset = dataset.repeat(EPOCHS)
-    iterator = tf.data.Iterator.from_structure(dataset.output_types, dataset.output_shapes)
-    dataset_init_op = iterator.make_initializer(dataset, name='dataset_init')
-    X, y = iterator.get_next()
+        dataset = tf.data.Dataset.from_tensor_slices((images_placeholder, labels_placeholder))
+        dataset = dataset.batch(batch_size)
+        dataset = dataset.repeat(EPOCHS)
+        iterator = tf.data.Iterator.from_structure(dataset.output_types, dataset.output_shapes)
+        dataset_init_op = iterator.make_initializer(dataset, name='dataset_init')
+        X, y = iterator.get_next()
 
-flatten_layer = tf.layers.flatten(X, name='flatten')
+    flatten_layer = tf.layers.flatten(X, name='flatten')
 
-dense_layer = tf.layers.dense(flatten_layer, 128, activation=tf.nn.relu, name='relu')
+    dense_layer = tf.layers.dense(flatten_layer, 128, activation=tf.nn.relu, name='relu')
 
-predictions = tf.layers.dense(dense_layer, 10, activation=tf.nn.softmax, name='softmax')
+    predictions = tf.layers.dense(dense_layer, 10, activation=tf.nn.softmax, name='softmax')
 
-summary_averages = tf.train.ExponentialMovingAverage(0.9)
+    summary_averages = tf.train.ExponentialMovingAverage(0.9)
 
-with tf.name_scope('loss'):
-    loss = tf.reduce_mean(keras.losses.sparse_categorical_crossentropy(y, predictions))
-    loss_averages_op = summary_averages.apply([loss])
-    tf.summary.scalar('cross_entropy', summary_averages.average(loss))
+    with tf.name_scope('loss'):
+        loss = tf.reduce_mean(keras.losses.sparse_categorical_crossentropy(y, predictions))
+        loss_averages_op = summary_averages.apply([loss])
+        tf.summary.scalar('cross_entropy', summary_averages.average(loss))
 
-with tf.name_scope('accuracy'):
-    with tf.name_scope('correct_prediction'):
-        correct_prediction = tf.equal(tf.argmax(predictions, 1), tf.cast(y, tf.int64))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy_metric')
-    accuracy_averages_op = summary_averages.apply([accuracy])
-    tf.summary.scalar('accuracy', summary_averages.average(accuracy))
+    with tf.name_scope('accuracy'):
+        with tf.name_scope('correct_prediction'):
+            correct_prediction = tf.equal(tf.argmax(predictions, 1), tf.cast(y, tf.int64))
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy_metric')
+        accuracy_averages_op = summary_averages.apply([accuracy])
+        tf.summary.scalar('accuracy', summary_averages.average(accuracy))
 
-with tf.name_scope('train'):
-    device_setter = tf.train.replica_device_setter(worker_device=worker_device, cluster=cluster)
-    optimizer = federated_averaging_optimizer.FederatedAveragingOptimizer(tf.train.AdamOptimizer(np.sqrt(num_workers) * 0.001), replicas_to_aggregate=num_workers, interval_steps=INTERVAL_STEPS, device_setter=device_setter)
-    with tf.control_dependencies([loss_averages_op, accuracy_averages_op]):
-        train_op = optimizer.minimize(loss, global_step=global_step)
-    model_average_hook = optimizer.make_session_run_hook(is_chief=is_chief)
+    with tf.name_scope('train'):
+        device_setter = tf.train.replica_device_setter(worker_device=worker_device, cluster=cluster)
+        optimizer = federated_averaging_optimizer.FederatedAveragingOptimizer(tf.train.AdamOptimizer(0.001), replicas_to_aggregate=num_workers, interval_steps=INTERVAL_STEPS, is_chief=is_chief, device_setter=device_setter)
+        with tf.control_dependencies([loss_averages_op, accuracy_averages_op]):
+            train_op = optimizer.minimize(loss, global_step=global_step)
+        model_average_hook = optimizer.make_session_run_hook()
 
 n_batches = int(train_images.shape[0] / BATCH_SIZE)
 last_step = int(n_batches * EPOCHS)
@@ -183,10 +184,8 @@ class _SaverHook(tf.train.SessionRunHook):
 with tf.name_scope('monitored_session'):
     with tf.train.MonitoredTrainingSession(
             master=server.target,
-            is_chief=is_chief,
             checkpoint_dir=checkpoint_dir,
-            hooks=[_LoggerHook(), _InitHook(), model_average_hook],
-            chief_only_hooks=[_SaverHook()],
+            hooks=[_LoggerHook(), _InitHook(), _SaverHook(), model_average_hook],
             config=sess_config,
             stop_grace_period_secs=10,
             save_checkpoint_secs=None) as mon_sess:
