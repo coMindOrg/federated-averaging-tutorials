@@ -6,7 +6,7 @@ This is the implementation of Federated Averaging using our custom hook. If you 
 
 First of all set the config file:
 
-> `SEND_RECEIVE_CONF.key = Shared key to sign messages and guarantee integrity` (a Bytearray)
+> `SEND_RECEIVE_CONF.key = Shared key to sign messages and guarantee integrity` (a Bytearray, you can leave it as is)
 
 Generate a private key and a certificate with: `openssl req -new -x509 -days 365 -nodes -out server.pem -keyout server.key`
 
