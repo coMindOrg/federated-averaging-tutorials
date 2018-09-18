@@ -131,66 +131,66 @@ with tf.device(worker_device):
             train_op = optimizer.minimize(loss, global_step=global_step)
         model_average_hook = optimizer.make_session_run_hook()
 
-n_batches = int(train_images.shape[0] / BATCH_SIZE)
-last_step = int(n_batches * EPOCHS)
+    n_batches = int(train_images.shape[0] / BATCH_SIZE)
+    last_step = int(n_batches * EPOCHS)
 
-print('Graph definition finished')
+    print('Graph definition finished')
 
-sess_config = tf.ConfigProto(
-    allow_soft_placement=True,
-    log_device_placement=False,
-    operation_timeout_in_ms=20000,
-    device_filters=["/job:ps",
-    "/job:worker/task:%d" % FLAGS.task_index])
+    sess_config = tf.ConfigProto(
+        allow_soft_placement=True,
+        log_device_placement=False,
+        operation_timeout_in_ms=20000,
+        device_filters=["/job:ps",
+        "/job:worker/task:%d" % FLAGS.task_index])
 
-print('Training {} batches...'.format(last_step))
+    print('Training {} batches...'.format(last_step))
 
-class _LoggerHook(tf.train.SessionRunHook):
-  def begin(self):
-      self._total_loss = 0
-      self._total_acc = 0
-
-  def before_run(self, run_context):
-      return tf.train.SessionRunArgs([loss, accuracy, global_step])
-
-  def after_run(self, run_context, run_values):
-      loss_value, acc_value, step_value = run_values.results
-      self._total_loss += loss_value
-      self._total_acc += acc_value
-      if (step_value + 1) % n_batches == 0:
-          print("Epoch {}/{} - loss: {:.4f} - acc: {:.4f}".format(int(step_value / n_batches) + 1, EPOCHS, self._total_loss / n_batches, self._total_acc / n_batches))
+    class _LoggerHook(tf.train.SessionRunHook):
+      def begin(self):
           self._total_loss = 0
           self._total_acc = 0
 
-class _InitHook(tf.train.SessionRunHook):
-    def after_create_session(self, session, coord):
-        session.run(dataset_init_op, feed_dict={images_placeholder: train_images, labels_placeholder: train_labels, batch_size: BATCH_SIZE})
+      def before_run(self, run_context):
+          return tf.train.SessionRunArgs([loss, accuracy, global_step])
 
-class _SaverHook(tf.train.SessionRunHook):
-    def begin(self):
-        self._saver = tf.train.Saver(tf.trainable_variables())
+      def after_run(self, run_context, run_values):
+          loss_value, acc_value, step_value = run_values.results
+          self._total_loss += loss_value
+          self._total_acc += acc_value
+          if (step_value + 1) % n_batches == 0:
+              print("Epoch {}/{} - loss: {:.4f} - acc: {:.4f}".format(int(step_value / n_batches) + 1, EPOCHS, self._total_loss / n_batches, self._total_acc / n_batches))
+              self._total_loss = 0
+              self._total_acc = 0
 
-    def before_run(self, run_context):
-        return tf.train.SessionRunArgs(global_step)
+    class _InitHook(tf.train.SessionRunHook):
+        def after_create_session(self, session, coord):
+            session.run(dataset_init_op, feed_dict={images_placeholder: train_images, labels_placeholder: train_labels, batch_size: BATCH_SIZE})
 
-    def after_run(self, run_context, run_values):
-        step_value = run_values.results
-        if step_value % n_batches == 0 and not step_value == 0:
-            self._saver.save(run_context.session, checkpoint_dir+'/model.ckpt', step_value)
+    class _SaverHook(tf.train.SessionRunHook):
+        def begin(self):
+            self._saver = tf.train.Saver(tf.trainable_variables())
 
-    def end(self, session):
-        self._saver.save(session, checkpoint_dir+'/model.ckpt', session.run(global_step))
+        def before_run(self, run_context):
+            return tf.train.SessionRunArgs(global_step)
 
-with tf.name_scope('monitored_session'):
-    with tf.train.MonitoredTrainingSession(
-            master=server.target,
-            checkpoint_dir=checkpoint_dir,
-            hooks=[_LoggerHook(), _InitHook(), _SaverHook(), model_average_hook],
-            config=sess_config,
-            stop_grace_period_secs=10,
-            save_checkpoint_secs=None) as mon_sess:
-        while not mon_sess.should_stop():
-            mon_sess.run(train_op)
+        def after_run(self, run_context, run_values):
+            step_value = run_values.results
+            if step_value % n_batches == 0 and not step_value == 0:
+                self._saver.save(run_context.session, checkpoint_dir+'/model.ckpt', step_value)
+
+        def end(self, session):
+            self._saver.save(session, checkpoint_dir+'/model.ckpt', session.run(global_step))
+
+    with tf.name_scope('monitored_session'):
+        with tf.train.MonitoredTrainingSession(
+                master=server.target,
+                checkpoint_dir=checkpoint_dir,
+                hooks=[_LoggerHook(), _InitHook(), _SaverHook(), model_average_hook],
+                config=sess_config,
+                stop_grace_period_secs=10,
+                save_checkpoint_secs=None) as mon_sess:
+            while not mon_sess.should_stop():
+                mon_sess.run(train_op)
 
 if is_chief:
     print('--- Begin Evaluation ---')

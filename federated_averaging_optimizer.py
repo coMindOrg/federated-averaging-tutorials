@@ -182,13 +182,18 @@ class FederatedAveragingOptimizer(optimizer.Optimizer):
        This creates a new copy of each user-defined trainable variable and places
        them on ps_device. These variables store the averaged parameters.
     """
+    if self._is_chief:
+      collections = [ops.GraphKeys.GLOBAL_VARIABLES, "global_model"]
+    else:
+      collections = ["global_model"]
+
     # Generate new global variables dependent on trainable variables.
     with ops.device(self._device_setter):
       for v in variables.trainable_variables():
-        _ = variable_scope.get_variable(
+        _ = variable_scope.variable(
             name="%s/%s" % (self._name, v.op.name),
-            initializer=v.initialized_value(), trainable=False,
-            collections=[ops.GraphKeys.GLOBAL_VARIABLES, "global_model"])
+            initial_value=v.initialized_value(), trainable=False,
+            collections=collections)
 
       self._global_step = variables.Variable(0, name="%s_global_step" %
           self._name, trainable=False)
@@ -313,7 +318,7 @@ class _FederatedAverageHook(session_run_hook.SessionRunHook):
     Args:
       fed_avg_optimizer: 'FederatedAveragingOptimizer' which this hook will
         initialize.
-      is_chief: 'Bool', whether this a is chief replica or not.
+      is_chief: 'Bool', whether this is a chief replica or not.
     """
     self._fed_avg_optimizer = fed_avg_optimizer
     self._is_chief = is_chief
@@ -321,15 +326,9 @@ class _FederatedAverageHook(session_run_hook.SessionRunHook):
   def begin(self):
     local_vars = variables.trainable_variables()
     global_vars = ops.get_collection_ref("global_model")
-    self._local_init_op = variables.local_variables_initializer()
-    self._global_init_op = None
-    if self._is_chief:
-      self._global_init_op = variables.global_variables_initializer()
-      self._chief_init_op = self._fed_avg_optimizer._chief_init_op  # pylint: disable=protected-access
     self._variable_init_op = self._fed_avg_optimizer._assign_vars(
         local_vars,
         global_vars)
 
   def after_create_session(self, session, coord):
-    """Runs FederatedAveragingOptimizer initialization ops."""
     session.run(self._variable_init_op)
