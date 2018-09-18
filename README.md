@@ -46,6 +46,12 @@ Follow the same steps for the `basic_federated_classifier.py`, `advanced_distrib
 * [Basic Distributed Classifier](https://colab.research.google.com/drive/1ZsSOD_J9aFRL4xACVUw0lau0Bc9IPD-C)
 * [Basic Federated Classifier](https://colab.research.google.com/drive/1zMNAJlqnNSziKYECTWhPyj4HSzg1g8sx)
 
+## Additional resources
+
+Check [MPI](https://github.com/coMindOrg/federated-averaging-tutorials/tree/master/MPI) to find an implementation of Federated Averaging with [Message Passing Interface](https://www.mpich.org/). This takes the communication out of TensorFlow and averages the weights with a custom hook. 
+
+Check [sockets](https://github.com/coMindOrg/federated-averaging-tutorials/tree/master/sockets) to find an implementation with python sockets. The same idea as with MPI but in this case we only need to know the public IP of the chief worker, and a custom hook will take care of the synchronization for us!
+
 ## Troubleshooting and Help
 
 coMind has public Slack and Telegram channels which are a great place to ask questions and all things related to federated machine learning.
