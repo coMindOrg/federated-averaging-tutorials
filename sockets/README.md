@@ -6,12 +6,12 @@ This is the implementation of Federated Averaging using our custom hook. If you 
 
 First of all set the config file:
 
-SEND_RECEIVE_CONF.key = Shared key to sign messages and guarantee integrity
+* SEND_RECEIVE_CONF.key = Shared key to sign messages and guarantee integrity
 
 Generate a private key and a certificate with: `openssl req -new -x509 -days 365 -nodes -out server.pem -keyout server.key`
 
-SSL_CONF.key_path = Path to your private key
-SSL_CONF.cert_path = Path to your certificate
+* SSL_CONF.key_path = Path to your private key
+* SSL_CONF.cert_path = Path to your certificate
 
 Next set the IP's in the main code to your own. No need to change this if you are using localhost.
 
