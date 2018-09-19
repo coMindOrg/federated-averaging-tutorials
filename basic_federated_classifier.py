@@ -24,6 +24,8 @@ import os
 import numpy as np
 from time import time
 import matplotlib.pyplot as plt
+
+# Import custom optimizer
 import federated_averaging_optimizer
 
 flags = tf.app.flags
@@ -37,9 +39,11 @@ flags.DEFINE_string("worker_hosts", "localhost:2223,localhost:2224",
                     "Comma-separated list of hostname:port pairs")
 flags.DEFINE_string("job_name", None, "job name: worker or ps")
 
+# You can safely tune these variables
 BATCH_SIZE = 32
 EPOCHS = 5
 INTERVAL_STEPS = 100
+# ----------------
 
 FLAGS = flags.FLAGS
 
@@ -48,6 +52,7 @@ if FLAGS.job_name is None or FLAGS.job_name == "":
 if FLAGS.task_index is None or FLAGS.task_index == "":
     raise ValueError("Must specify an explicit `task_index`")
 
+# Only enable GPU for worker 1 (not needed if training with separate machines)
 if FLAGS.task_index == 0:
     print('--- GPU Disabled ---')
     os.environ['CUDA_VISIBLE_DEVICES'] = ''
@@ -63,21 +68,26 @@ print('{} workers defined'.format(num_workers))
 cluster = tf.train.ClusterSpec({"ps": ps_spec, "worker": worker_spec})
 
 server = tf.train.Server(cluster, job_name=FLAGS.job_name, task_index=FLAGS.task_index)
+# Parameter server will block here
 if FLAGS.job_name == "ps":
     print('--- Parameter Server Ready ---')
     server.join()
 
+# Load dataset as numpy arrays
 fashion_mnist = keras.datasets.fashion_mnist
 (train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
 print('Data loaded')
 
+# List with class names to see the labels of the images with matplotlib
 class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
                'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
 
+# Split dataset between workers
 train_images = np.array_split(train_images, num_workers)[FLAGS.task_index]
 train_labels = np.array_split(train_labels, num_workers)[FLAGS.task_index]
 print('Local dataset size: {}'.format(train_images.shape[0]))
 
+# Normalize dataset
 train_images = train_images / 255.0
 test_images = test_images / 255.0
 
@@ -89,49 +99,68 @@ print('Checkpoint directory: ' + checkpoint_dir)
 worker_device = "/job:worker/task:%d" % FLAGS.task_index
 print('Worker device: ' + worker_device + ' - is_chief: {}'.format(is_chief))
 
+# Place all ops in the local worker by default
 with tf.device(worker_device):
     global_step = tf.train.get_or_create_global_step()
 
+    # Define input pipeline, place these ops in the cpu
     with tf.name_scope('dataset'), tf.device('/cpu:0'):
+        # Placeholders for the iterator
         images_placeholder = tf.placeholder(train_images.dtype, [None, train_images.shape[1], train_images.shape[2]], name='images_placeholder')
         labels_placeholder = tf.placeholder(train_labels.dtype, [None], name='labels_placeholder')
         batch_size = tf.placeholder(tf.int64, name='batch_size')
         shuffle_size = tf.placeholder(tf.int64, name='shuffle_size')
 
+        # Create dataset from numpy arrays, shuffle, repeat and batch
         dataset = tf.data.Dataset.from_tensor_slices((images_placeholder, labels_placeholder))
         dataset = dataset.shuffle(shuffle_size, reshuffle_each_iteration=True)
         dataset = dataset.repeat(EPOCHS)
         dataset = dataset.batch(batch_size)
+        # Define a feedable iterator and the initialization op
         iterator = tf.data.Iterator.from_structure(dataset.output_types, dataset.output_shapes)
         dataset_init_op = iterator.make_initializer(dataset, name='dataset_init')
         X, y = iterator.get_next()
 
+    # Define our model
     flatten_layer = tf.layers.flatten(X, name='flatten')
 
     dense_layer = tf.layers.dense(flatten_layer, 128, activation=tf.nn.relu, name='relu')
 
     predictions = tf.layers.dense(dense_layer, 10, activation=tf.nn.softmax, name='softmax')
 
+    # Object to keep moving averages of our metrics (for tensorboard)
     summary_averages = tf.train.ExponentialMovingAverage(0.9)
 
+    # Define cross_entropy loss
     with tf.name_scope('loss'):
         loss = tf.reduce_mean(keras.losses.sparse_categorical_crossentropy(y, predictions))
         loss_averages_op = summary_averages.apply([loss])
+        # Store moving average of the loss
         tf.summary.scalar('cross_entropy', summary_averages.average(loss))
 
+    # Define accuracy metric
     with tf.name_scope('accuracy'):
         with tf.name_scope('correct_prediction'):
+            # Compare prediction with actual label
             correct_prediction = tf.equal(tf.argmax(predictions, 1), tf.cast(y, tf.int64))
+        # Average correct predictions in the current batch
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy_metric')
         accuracy_averages_op = summary_averages.apply([accuracy])
+        # Store moving average of the accuracy
         tf.summary.scalar('accuracy', summary_averages.average(accuracy))
 
+    # Define optimizer and training op
     with tf.name_scope('train'):
+        # Define device setter to place copies of local variables
         device_setter = tf.train.replica_device_setter(worker_device=worker_device, cluster=cluster)
+        # Wrap optimizer in a FederatedAveragingOptimizer for federated training
         optimizer = federated_averaging_optimizer.FederatedAveragingOptimizer(tf.train.AdamOptimizer(0.001), replicas_to_aggregate=num_workers, interval_steps=INTERVAL_STEPS, is_chief=is_chief, device_setter=device_setter)
+        # Make train_op dependent on moving averages ops. Otherwise they will be
+        # disconnected from the graph
         with tf.control_dependencies([loss_averages_op, accuracy_averages_op]):
             train_op = optimizer.minimize(loss, global_step=global_step)
-        model_average_hook = optimizer.make_session_run_hook()
+        # Define a hook for optimizer initialization
+        federated_hook = optimizer.make_session_run_hook()
 
     n_batches = int(train_images.shape[0] / BATCH_SIZE)
     last_step = int(n_batches * EPOCHS)
@@ -147,6 +176,7 @@ with tf.device(worker_device):
 
     print('Training {} batches...'.format(last_step))
 
+    # Logger hook to keep track of the training
     class _LoggerHook(tf.train.SessionRunHook):
       def begin(self):
           self._total_loss = 0
@@ -164,10 +194,12 @@ with tf.device(worker_device):
               self._total_loss = 0
               self._total_acc = 0
 
+    # Hook to initialize the dataset
     class _InitHook(tf.train.SessionRunHook):
         def after_create_session(self, session, coord):
             session.run(dataset_init_op, feed_dict={images_placeholder: train_images, labels_placeholder: train_labels, batch_size: BATCH_SIZE, shuffle_size: train_images.shape[0]})
 
+    # Hook to save just trainable_variables
     class _SaverHook(tf.train.SessionRunHook):
         def begin(self):
             self._saver = tf.train.Saver(tf.trainable_variables())
@@ -183,11 +215,12 @@ with tf.device(worker_device):
         def end(self, session):
             self._saver.save(session, checkpoint_dir+'/model.ckpt', session.run(global_step))
 
+    # Make sure we do not define a chief worker
     with tf.name_scope('monitored_session'):
         with tf.train.MonitoredTrainingSession(
                 master=server.target,
                 checkpoint_dir=checkpoint_dir,
-                hooks=[_LoggerHook(), _InitHook(), _SaverHook(), model_average_hook],
+                hooks=[_LoggerHook(), _InitHook(), _SaverHook(), federated_hook],
                 config=sess_config,
                 stop_grace_period_secs=10,
                 save_checkpoint_secs=None) as mon_sess:
@@ -196,6 +229,7 @@ with tf.device(worker_device):
 
 if is_chief:
     print('--- Begin Evaluation ---')
+    # Reset graph and load it again to clean tensors placed in other devices
     tf.reset_default_graph()
     with tf.Session() as sess:
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
