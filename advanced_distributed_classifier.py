@@ -15,15 +15,14 @@
 # https://comind.org/
 # ==============================================================================
 
-# TensorFlow and tf.keras
+# TensorFlow
 import tensorflow as tf
-from tensorflow import keras
 
 # Helper libraries
 import os
 import numpy as np
 from time import time
-import matplotlib.pyplot as plt
+import multiprocessing
 
 flags = tf.app.flags
 flags.DEFINE_integer("task_index", None,
@@ -37,8 +36,10 @@ flags.DEFINE_string("worker_hosts", "localhost:2223,localhost:2224",
 flags.DEFINE_string("job_name", None, "job name: worker or ps")
 
 BATCH_SIZE = 128
+SHUFFLE_SIZE = BATCH_SIZE * 100
 EPOCHS = 250
 EPOCHS_PER_DECAY = 50
+BATCHES_TO_PREFETCH = 1
 
 FLAGS = flags.FLAGS
 
@@ -59,6 +60,13 @@ worker_spec = FLAGS.worker_hosts.split(",")
 num_workers = len(worker_spec)
 print('{} workers defined'.format(num_workers))
 
+num_train_images = int(50000 / num_workers)
+num_test_images = 10000
+height = 32
+width = 32
+channels = 3
+num_batch_files = 5
+
 cluster = tf.train.ClusterSpec({"ps": ps_spec, "worker": worker_spec})
 
 server = tf.train.Server(cluster, job_name=FLAGS.job_name, task_index=FLAGS.task_index)
@@ -66,19 +74,12 @@ if FLAGS.job_name == "ps":
     print('--- Parameter Server Ready ---')
     server.join()
 
-cifar10 = keras.datasets.cifar10
-(train_images, train_labels), (test_images, test_labels) = cifar10.load_data()
-print('Data loaded')
+cifar10_train_files = ['/home/acuratio/Documents/tensorflow/include/cifar-10-tf-records/train{}.tfrecords'.format(i) for i in range(num_batch_files)]
+cifar10_test_file = '/home/acuratio/Documents/tensorflow/include/cifar-10-tf-records/test.tfrecords'
 
+np.random.shuffle(cifar10_train_files)
 class_names = ['Airplane', 'Automobile', 'Bird', 'Cat', 'Deer',
                'Dog', 'Frog', 'Horse', 'Ship', 'Truck']
-
-train_images = np.array_split(train_images, num_workers)[FLAGS.task_index]
-train_labels = np.array_split(train_labels, num_workers)[FLAGS.task_index]
-print('Local dataset size: {}'.format(train_images.shape[0]))
-
-train_labels = train_labels.flatten()
-test_labels = test_labels.flatten()
 
 is_chief = (FLAGS.task_index == 0)
 
@@ -88,33 +89,39 @@ print('Checkpoint directory: ' + checkpoint_dir)
 worker_device = "/job:worker/task:%d" % FLAGS.task_index
 print('Worker device: ' + worker_device + ' - is_chief: {}'.format(is_chief))
 
+cpu_count = int(multiprocessing.cpu_count() / num_workers)
+
 with tf.device(
       tf.train.replica_device_setter(
           worker_device=worker_device,
           cluster=cluster)):
     global_step = tf.train.get_or_create_global_step()
 
-    with tf.name_scope('dataset'):
-        def preprocess(image, label):
+    with tf.name_scope('dataset'), tf.device('/cpu:0'):
+        def preprocess(serialized_examples):
+            features = tf.parse_example(serialized_examples, {'image': tf.FixedLenFeature([], tf.string), 'label': tf.FixedLenFeature([], tf.int64)})
+            image = tf.map_fn(lambda img: tf.reshape(tf.decode_raw(img, tf.uint8), tf.stack([height, width, channels])), features['image'], dtype=tf.uint8, name='decode')
             casted_image = tf.cast(image, tf.float32, name='input_cast')
-            casted_label = tf.cast(label, tf.int64, name='label_cast')
             resized_image = tf.image.resize_image_with_crop_or_pad(casted_image, 24, 24)
-            distorted_image = tf.random_crop(casted_image, [24, 24, 3], name='random_crop')
+            distorted_image = tf.map_fn(lambda img: tf.random_crop(img, [24, 24, 3]), casted_image, name='random_crop')
             distorted_image = tf.image.random_flip_left_right(distorted_image)
             distorted_image = tf.image.random_brightness(distorted_image, 63)
             distorted_image = tf.image.random_contrast(distorted_image, 0.2, 1.8)
             result = tf.cond(train_mode, lambda: distorted_image, lambda: resized_image)
-            processed_image = tf.image.per_image_standardization(result)
-            return processed_image, casted_label
-        images_placeholder = tf.placeholder(train_images.dtype, [None, train_images.shape[1], train_images.shape[2], train_images.shape[3]], name='images_placeholder')
-        labels_placeholder = tf.placeholder(train_labels.dtype, [None], name='labels_placeholder')
+            processed_image = tf.map_fn(lambda img: tf.image.per_image_standardization(img), result, name='standardization')
+            return processed_image, features['label']
+        filename_placeholder = tf.placeholder(tf.string, name='input_filename')
         batch_size = tf.placeholder(tf.int64, name='batch_size')
+        shuffle_size = tf.placeholder(tf.int64, name='shuffle_size')
         train_mode = tf.placeholder(tf.bool, name='train_mode')
 
-        dataset = tf.data.Dataset.from_tensor_slices((images_placeholder, labels_placeholder))
-        dataset = dataset.map(lambda x, y: preprocess(x, y))
-        dataset = dataset.batch(batch_size)
+        dataset = tf.data.TFRecordDataset(filename_placeholder)
+        dataset = dataset.shard(num_workers, FLAGS.task_index)
+        dataset = dataset.shuffle(shuffle_size, reshuffle_each_iteration=True)
         dataset = dataset.repeat(EPOCHS)
+        dataset = dataset.batch(batch_size)
+        dataset = dataset.map(preprocess, cpu_count)
+        dataset = dataset.prefetch(BATCHES_TO_PREFETCH)
         iterator = tf.data.Iterator.from_structure(dataset.output_types, dataset.output_shapes)
         dataset_init_op = iterator.make_initializer(dataset, name='dataset_init')
         X, y = iterator.get_next()
@@ -140,7 +147,7 @@ with tf.device(
     logits = tf.layers.dense(second_relu, 10, kernel_initializer=tf.truncated_normal_initializer(stddev=1/192.0), name='logits')
 
     summary_averages = tf.train.ExponentialMovingAverage(0.9)
-    n_batches = int(train_images.shape[0] / (BATCH_SIZE * num_workers))
+    n_batches = int(num_train_images / (BATCH_SIZE * num_workers))
 
     with tf.name_scope('loss'):
         base_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=logits), name='base_loss')
@@ -202,7 +209,7 @@ with tf.device(
 
     class _InitHook(tf.train.SessionRunHook):
         def after_create_session(self, session, coord):
-            session.run(dataset_init_op, feed_dict={images_placeholder: train_images, labels_placeholder: train_labels, batch_size: BATCH_SIZE, train_mode: True})
+            session.run(dataset_init_op, feed_dict={filename_placeholder: cifar10_train_files, batch_size: BATCH_SIZE, shuffle_size: SHUFFLE_SIZE, train_mode: True})
 
     with tf.name_scope('monitored_session'):
         with tf.train.MonitoredTrainingSession(
@@ -226,34 +233,11 @@ if is_chief:
         saver.restore(sess, ckpt.model_checkpoint_path)
         print('Model restored')
         graph = tf.get_default_graph()
-        images_placeholder = graph.get_tensor_by_name('dataset/images_placeholder:0')
-        labels_placeholder = graph.get_tensor_by_name('dataset/labels_placeholder:0')
+        filename_placeholder = graph.get_tensor_by_name('dataset/input_filename:0')
         batch_size = graph.get_tensor_by_name('dataset/batch_size:0')
+        shuffle_size = graph.get_tensor_by_name('dataset/shuffle_size:0')
         train_mode = graph.get_tensor_by_name('dataset/train_mode:0')
         accuracy = graph.get_tensor_by_name('accuracy/accuracy_metric:0')
-        logits = graph.get_tensor_by_name('logits/BiasAdd:0')
         dataset_init_op = graph.get_operation_by_name('dataset/dataset_init')
-        sess.run(dataset_init_op, feed_dict={images_placeholder: test_images, labels_placeholder: test_labels, batch_size: test_images.shape[0], train_mode: False})
+        sess.run(dataset_init_op, feed_dict={filename_placeholder: cifar10_test_file, batch_size: num_test_images, shuffle_size: 1, train_mode: False})
         print('Test accuracy: {:4f}'.format(sess.run(accuracy)))
-        predicted = sess.run(logits)
-
-    # Plot the first 25 test images, their predicted label, and the true label
-    # Color correct predictions in green, incorrect predictions in red
-    plt.figure(figsize=(10, 10))
-    for i in range(25):
-        plt.subplot(5, 5, i + 1)
-        plt.xticks([])
-        plt.yticks([])
-        plt.grid(False)
-        plt.imshow(test_images[i], cmap=plt.cm.binary)
-        predicted_label = np.argmax(predicted[i])
-        true_label = test_labels[i]
-        if predicted_label == true_label:
-          color = 'green'
-        else:
-          color = 'red'
-        plt.xlabel("{} ({})".format(class_names[predicted_label],
-                                    class_names[true_label]),
-                                    color=color)
-
-    plt.show(True)
