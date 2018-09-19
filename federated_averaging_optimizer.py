@@ -307,21 +307,19 @@ class FederatedAveragingOptimizer(optimizer.Optimizer):
 
   def make_session_run_hook(self):
     """Creates a hook to handle federated average and init operations."""
-    return _FederatedAverageHook(self, self._is_chief)
+    return _FederatedAverageHook(self)
 
 class _FederatedAverageHook(session_run_hook.SessionRunHook):
   """A SessionRunHook that handles ops related to FederatedAveragingOptimizer."""
 
-  def __init__(self, fed_avg_optimizer, is_chief):
+  def __init__(self, fed_avg_optimizer):
     """Creates hook to handle FederatedAveragingOptimizer
 
     Args:
       fed_avg_optimizer: 'FederatedAveragingOptimizer' which this hook will
         initialize.
-      is_chief: 'Bool', whether this is a chief replica or not.
     """
     self._fed_avg_optimizer = fed_avg_optimizer
-    self._is_chief = is_chief
 
   def begin(self):
     local_vars = variables.trainable_variables()
