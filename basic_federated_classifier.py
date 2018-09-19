@@ -99,9 +99,9 @@ with tf.device(worker_device):
         shuffle_size = tf.placeholder(tf.int64, name='shuffle_size')
 
         dataset = tf.data.Dataset.from_tensor_slices((images_placeholder, labels_placeholder))
+        dataset = dataset.repeat(EPOCHS)
         dataset = dataset.shuffle(shuffle_size, reshuffle_each_iteration=True)
         dataset = dataset.batch(batch_size)
-        dataset = dataset.repeat(EPOCHS)
         iterator = tf.data.Iterator.from_structure(dataset.output_types, dataset.output_shapes)
         dataset_init_op = iterator.make_initializer(dataset, name='dataset_init')
         X, y = iterator.get_next()
