@@ -70,6 +70,12 @@ The Federated Averaging algorithm is explained in more detail in the following p
 
 H. B. McMahan, E. Moore, D. Ramage, S. Hampson, and B. A. y Arcas. [Communication-efficient learning of deep networks from decentralized data](https://arxiv.org/pdf/1602.05629.pdf). In Conference on Artificial Intelligence and Statistics, 2017.
 
+The datsets used in these examples were:
+
+Alex Krizhevsky. [Learning Multiple Layers of Features from Tiny Images](https://www.cs.toronto.edu/~kriz/learning-features-2009-TR.pdf).
+
+Han Xiao, Kashif Rasul, Roland Vollgraf. [Fashion-MNIST: a Novel Image Dataset for Benchmarking Machine Learning Algorithms](https://arxiv.org/abs/1708.07747).
+
 ## About
 
 coMind is an open source project for training privacy-preserving federated deep learning models. 
