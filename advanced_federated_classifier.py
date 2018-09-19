@@ -84,9 +84,9 @@ if FLAGS.job_name == "ps":
     print('--- Parameter Server Ready ---')
     server.join()
 
-# Path to TFRecord files
-cifar10_train_files = ['/home/acuratio/Documents/tensorflow/include/cifar-10-tf-records/train{}.tfrecords'.format(i) for i in range(num_batch_files)]
-cifar10_test_file = '/home/acuratio/Documents/tensorflow/include/cifar-10-tf-records/test.tfrecords'
+# Path to TFRecord files (check readme for instructions on how to get these files)
+cifar10_train_files = ['cifar-10-tf-records/train{}.tfrecords'.format(i) for i in range(num_batch_files)]
+cifar10_test_file = 'cifar-10-tf-records/test.tfrecords'
 
 # Shuffle filenames before loading them
 np.random.shuffle(cifar10_train_files)
@@ -148,7 +148,7 @@ with tf.device(worker_device):
         X, y = iterator.get_next()
 
     # Define our model
-    first_conv = tf.layers.conv2d(input_transpose, 64, 5, padding='SAME', activation=tf.nn.relu, kernel_initializer=tf.truncated_normal_initializer(stddev=5e-2), name='first_conv')
+    first_conv = tf.layers.conv2d(X, 64, 5, padding='SAME', activation=tf.nn.relu, kernel_initializer=tf.truncated_normal_initializer(stddev=5e-2), name='first_conv')
 
     first_pool = tf.nn.max_pool(first_conv, [1, 3, 3 ,1], [1, 2, 2, 1], padding='SAME', name='first_pool')
 

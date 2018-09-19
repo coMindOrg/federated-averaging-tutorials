@@ -80,9 +80,9 @@ if FLAGS.job_name == "ps":
     print('--- Parameter Server Ready ---')
     server.join()
 
-# Path to TFRecord files
-cifar10_train_files = ['/home/acuratio/Documents/tensorflow/include/cifar-10-tf-records/train{}.tfrecords'.format(i) for i in range(num_batch_files)]
-cifar10_test_file = '/home/acuratio/Documents/tensorflow/include/cifar-10-tf-records/test.tfrecords'
+# Path to TFRecord files (check readme for instructions on how to get these files)
+cifar10_train_files = ['cifar-10-tf-records/train{}.tfrecords'.format(i) for i in range(num_batch_files)]
+cifar10_test_file = 'cifar-10-tf-records/test.tfrecords'
 
 # Shuffle filenames before loading them
 np.random.shuffle(cifar10_train_files)
