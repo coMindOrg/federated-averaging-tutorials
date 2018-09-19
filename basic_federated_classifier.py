@@ -92,12 +92,14 @@ print('Worker device: ' + worker_device + ' - is_chief: {}'.format(is_chief))
 with tf.device(worker_device):
     global_step = tf.train.get_or_create_global_step()
 
-    with tf.name_scope('dataset'):
+    with tf.name_scope('dataset'), tf.device('/cpu:0'):
         images_placeholder = tf.placeholder(train_images.dtype, [None, train_images.shape[1], train_images.shape[2]], name='images_placeholder')
         labels_placeholder = tf.placeholder(train_labels.dtype, [None], name='labels_placeholder')
         batch_size = tf.placeholder(tf.int64, name='batch_size')
+        shuffle_size = tf.placeholder(tf.int64, name='shuffle_size')
 
         dataset = tf.data.Dataset.from_tensor_slices((images_placeholder, labels_placeholder))
+        dataset = dataset.shuffle(shuffle_size, reshuffle_each_iteration=True)
         dataset = dataset.batch(batch_size)
         dataset = dataset.repeat(EPOCHS)
         iterator = tf.data.Iterator.from_structure(dataset.output_types, dataset.output_shapes)
@@ -164,7 +166,7 @@ with tf.device(worker_device):
 
     class _InitHook(tf.train.SessionRunHook):
         def after_create_session(self, session, coord):
-            session.run(dataset_init_op, feed_dict={images_placeholder: train_images, labels_placeholder: train_labels, batch_size: BATCH_SIZE})
+            session.run(dataset_init_op, feed_dict={images_placeholder: train_images, labels_placeholder: train_labels, batch_size: BATCH_SIZE, shuffle_size: train_images.shape[0]})
 
     class _SaverHook(tf.train.SessionRunHook):
         def begin(self):
@@ -204,10 +206,11 @@ if is_chief:
         images_placeholder = graph.get_tensor_by_name('dataset/images_placeholder:0')
         labels_placeholder = graph.get_tensor_by_name('dataset/labels_placeholder:0')
         batch_size = graph.get_tensor_by_name('dataset/batch_size:0')
+        shuffle_size = graph.get_tensor_by_name('dataset/shuffle_size:0')
         accuracy = graph.get_tensor_by_name('accuracy/accuracy_metric:0')
         predictions = graph.get_tensor_by_name('softmax/BiasAdd:0')
         dataset_init_op = graph.get_operation_by_name('dataset/dataset_init')
-        sess.run(dataset_init_op, feed_dict={images_placeholder: test_images, labels_placeholder: test_labels, batch_size: test_images.shape[0]})
+        sess.run(dataset_init_op, feed_dict={images_placeholder: test_images, labels_placeholder: test_labels, batch_size: test_images.shape[0], shuffle_size: 1})
         print('Test accuracy: {:4f}'.format(sess.run(accuracy)))
         predicted = sess.run(predictions)
 

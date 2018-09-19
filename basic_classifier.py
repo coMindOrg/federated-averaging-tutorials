@@ -43,12 +43,14 @@ print('Checkpoint directory: ' + checkpoint_dir)
 
 global_step = tf.train.get_or_create_global_step()
 
-with tf.name_scope('dataset'):
-    images_placeholder = tf.placeholder(train_images.dtype, [None, train_images.shape[1], train_images.shape[2]])
-    labels_placeholder = tf.placeholder(train_labels.dtype, [None])
-    batch_size = tf.placeholder(tf.int64)
+with tf.name_scope('dataset'), tf.device('/cpu:0'):
+    images_placeholder = tf.placeholder(train_images.dtype, [None, train_images.shape[1], train_images.shape[2]], name='images_placeholder')
+    labels_placeholder = tf.placeholder(train_labels.dtype, [None], name='labels_placeholder')
+    batch_size = tf.placeholder(tf.int64, name='batch_size')
+    shuffle_size = tf.placeholder(tf.int64, name='shuffle_size')
 
     dataset = tf.data.Dataset.from_tensor_slices((images_placeholder, labels_placeholder))
+    dataset = dataset.shuffle(shuffle_size, reshuffle_each_iteration=True)
     dataset = dataset.batch(batch_size)
     dataset = dataset.repeat(EPOCHS)
     iterator = tf.data.Iterator.from_structure(dataset.output_types, dataset.output_shapes)
@@ -105,7 +107,7 @@ class _LoggerHook(tf.train.SessionRunHook):
 
 class _InitHook(tf.train.SessionRunHook):
     def after_create_session(self, session, coord):
-        session.run(dataset_init_op, feed_dict={images_placeholder: train_images, labels_placeholder: train_labels, batch_size: BATCH_SIZE})
+        session.run(dataset_init_op, feed_dict={images_placeholder: train_images, labels_placeholder: train_labels, batch_size: BATCH_SIZE, shuffle_size: train_images.shape[0]})
 
 with tf.name_scope('monitored_session'):
     with tf.train.MonitoredTrainingSession(
@@ -121,7 +123,7 @@ with tf.Session() as sess:
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
     tf.train.Saver().restore(sess, ckpt.model_checkpoint_path)
     print('Model restored')
-    sess.run(dataset_init_op, feed_dict={images_placeholder: test_images, labels_placeholder: test_labels, batch_size: test_images.shape[0]})
+    sess.run(dataset_init_op, feed_dict={images_placeholder: test_images, labels_placeholder: test_labels, batch_size: test_images.shape[0], shuffle_size: 1})
     print('Test accuracy: {:4f}'.format(sess.run(accuracy)))
     predicted = sess.run(predictions)
 
