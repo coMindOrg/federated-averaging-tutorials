@@ -52,6 +52,8 @@ Check [MPI](https://github.com/coMindOrg/federated-averaging-tutorials/tree/mast
 
 Check [sockets](https://github.com/coMindOrg/federated-averaging-tutorials/tree/master/sockets) to find an implementation with python sockets. The same idea as with MPI but in this case we only need to know the public IP of the chief worker, and a custom hook will take care of the synchronization for us!
 
+Check [this script](https://github.com/tensorflow/models/blob/master/tutorials/image/cifar10_estimator/generate_cifar10_tfrecords.py) to see how to generate CIFAR-10 TFRecords.
+
 ## Troubleshooting and Help
 
 coMind has public Slack and Telegram channels which are a great place to ask questions and all things related to federated machine learning.
