@@ -59,6 +59,11 @@ fashion_mnist = keras.datasets.fashion_mnist
 class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
                'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
 
+# Split dataset between workers
+train_images = np.array_split(train_images, num_workers)[FLAGS.task_index]
+train_labels = np.array_split(train_labels, num_workers)[FLAGS.task_index]
+print('Local dataset size: {}'.format(train_images.shape[0]))
+
 # Normalize dataset
 train_images = train_images / 255.0
 test_images = test_images / 255.0
