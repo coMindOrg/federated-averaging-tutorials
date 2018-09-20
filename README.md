@@ -48,9 +48,9 @@ Follow the same steps for the `basic_federated_classifier.py`, `advanced_distrib
 
 ## Additional resources
 
-Check [MPI](https://github.com/coMindOrg/federated-averaging-tutorials/tree/master/MPI) to find an implementation of Federated Averaging with [Message Passing Interface](https://www.mpich.org/). This takes the communication out of TensorFlow and averages the weights with a custom hook. 
+Check [MPI](https://github.com/coMindOrg/federated-averaging-tutorials/tree/master/federated-MPI) to find an implementation of Federated Averaging with [Message Passing Interface](https://www.mpich.org/). This takes the communication out of TensorFlow and averages the weights with a custom hook. 
 
-Check [sockets](https://github.com/coMindOrg/federated-averaging-tutorials/tree/master/sockets) to find an implementation with python sockets. The same idea as with MPI but in this case we only need to know the public IP of the chief worker, and a custom hook will take care of the synchronization for us!
+Check [sockets](https://github.com/coMindOrg/federated-averaging-tutorials/tree/master/federated-sockets) to find an implementation with python sockets. The same idea as with MPI but in this case we only need to know the public IP of the chief worker, and a custom hook will take care of the synchronization for us!
 
 Check [this script](https://github.com/tensorflow/models/blob/master/tutorials/image/cifar10_estimator/generate_cifar10_tfrecords.py) to see how to generate CIFAR-10 TFRecords.
 
