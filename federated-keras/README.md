@@ -4,7 +4,7 @@ This shows the usage of the distributed and federated set-ups with keras.
 
 ## Dependencies
 
-You will need the custom `federated_averaging_optimizer.py` to be able to run keras. You can [find it](https://github.com/coMindOrg/federated-averaging-tutorials/blob/master/federated_averaging_optimizer.py) in this same repository.
+You will need the custom `federated_averaging_optimizer.py` to be able to run the keras example. You can [find it](https://github.com/coMindOrg/federated-averaging-tutorials/blob/master/federated_averaging_optimizer.py) in this same repository.
 
 ## Usage
 
