@@ -294,12 +294,12 @@ class _FederatedHook(tf.train.SessionRunHook):
                         keyfile=SC.key_path,
                         ssl_version=ssl.PROTOCOL_TLSv1)
 
-                    print('Connected: ' + address[0] + ':' + str(address[1])
+                    print('Connected: ' + address[0] + ':' + str(address[1]))
                 except:
                     print('Some workers could not connect')
                     break
                 try:
-                    print('SENDING Worker: {}' + address[0] + ':' + str(address[1])
+                    print('SENDING Worker: ' + address[0] + ':' + str(address[1]))
                     self._send_np_array(session.run(tf.trainable_variables()), connection_socket)
                     print('SENT Worker {}'.format(len(users)))
                     users.append(connection_socket)
@@ -371,7 +371,7 @@ class _FederatedHook(tf.train.SessionRunHook):
                             keyfile=SC.key_path,
                             ssl_version=ssl.PROTOCOL_TLSv1)
 
-                        print('Connected: ' + address[0] + ':' + str(address[1])
+                        print('Connected: ' + address[0] + ':' + str(address[1]))
                     except:
                         print('Some workers could not connect')
                         break
