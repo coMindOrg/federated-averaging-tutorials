@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Modifications copyright (C) 2018 CoMind.
+# Modifications copyright (C) 2018 coMind.
 # ==============================================================================
 
 """Synchronize replicas for FedAvg training."""
