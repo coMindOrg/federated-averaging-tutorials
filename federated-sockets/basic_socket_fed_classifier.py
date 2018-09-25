@@ -51,8 +51,8 @@ fashion_mnist = keras.datasets.fashion_mnist
 (train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
 
 # Split dataset
-train_images = np.array_split(train_images, federated_hook._num_workers)[federated_hook._task_index]
-train_labels = np.array_split(train_labels, federated_hook._num_workers)[federated_hook._task_index]
+train_images = np.array_split(train_images, federated_hook.num_workers)[federated_hook.task_index]
+train_labels = np.array_split(train_labels, federated_hook.num_workers)[federated_hook.task_index]
 
 # You can safely tune this variable
 SHUFFLE_SIZE = train_images.shape[0]
@@ -147,7 +147,7 @@ class _InitHook(tf.train.SessionRunHook):
     def after_create_session(self, session, coord):
         session.run(dataset_init_op, feed_dict={images_placeholder: train_images, labels_placeholder: train_labels, shuffle_size: SHUFFLE_SIZE, batch_size: BATCH_SIZE})
 
-print("Worker {} ready".format(federated_hook._task_index))
+print("Worker {} ready".format(federated_hook.task_index))
 
 with tf.name_scope('monitored_session'):
     with tf.train.MonitoredTrainingSession(
