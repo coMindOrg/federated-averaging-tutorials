@@ -141,7 +141,7 @@ with tf.name_scope('monitored_session'):
             mon_sess.run(train_op)
 
 print('--- Begin Evaluation ---')
-with tf.Session() as sess:
+with tf.device('/cpu:0'), tf.Session() as sess:
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
     tf.train.Saver().restore(sess, ckpt.model_checkpoint_path)
     print('Model restored')
