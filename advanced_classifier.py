@@ -196,10 +196,9 @@ with tf.name_scope('monitored_session'):
             mon_sess.run(train_op)
 
 print('--- Begin Evaluation ---')
-# Make GPU not visible and reset graph to avoid OOM
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
+# Reset graph and place ops in cpu to avoid OOM
 tf.reset_default_graph()
-with tf.Session() as sess:
+with tf.device('/cpu:0'), tf.Session() as sess:
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
     saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path + '.meta', clear_devices=True)
     saver.restore(sess, ckpt.model_checkpoint_path)
