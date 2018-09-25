@@ -7,6 +7,10 @@ import os
 import numpy as np
 from time import time
 
+# Trick to import from parent directory
+import sys
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+
 import federated_averaging_optimizer
 
 flags = tf.app.flags
