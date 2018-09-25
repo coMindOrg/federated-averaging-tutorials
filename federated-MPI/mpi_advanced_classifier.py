@@ -31,7 +31,13 @@ SHUFFLE_SIZE = BATCH_SIZE * 100
 EPOCHS = 250
 EPOCHS_PER_DECAY = 50
 INTERVAL_STEPS = 100 # Steps between averages
+BATCHES_TO_PREFETCH = 1
 # -----------------
+
+# Let the code know about the MPI config
+comm = MPI.COMM_WORLD
+
+num_workers = comm.size
 
 # Dataset dependent constants
 num_train_images = int(50000 / num_workers)
@@ -40,9 +46,6 @@ height = 32
 width = 32
 channels = 3
 num_batch_files = 5
-
-# Let the code know about the MPI config
-comm = MPI.COMM_WORLD
 
 # Path to TFRecord files (check readme for instructions on how to get these files)
 cifar10_train_files = ['cifar-10-tf-records/train{}.tfrecords'.format(i) for i in range(num_batch_files)]
@@ -57,7 +60,7 @@ sys.stdout.flush()
 
 global_step = tf.train.get_or_create_global_step()
 
-cpu_count = int(multiprocessing.cpu_count() / federated_hook.num_workers)
+cpu_count = int(multiprocessing.cpu_count() / num_workers)
 
 # Define input pipeline, place these ops in the cpu
 with tf.name_scope('dataset'), tf.device('/cpu:0'):
@@ -89,7 +92,7 @@ with tf.name_scope('dataset'), tf.device('/cpu:0'):
 
     # Create dataset, shuffle, repeat, batch, map and prefetch
     dataset = tf.data.TFRecordDataset(filename_placeholder)
-    dataset = dataset.shard(num_workers, FLAGS.task_index)
+    dataset = dataset.shard(num_workers, comm.rank)
     dataset = dataset.shuffle(shuffle_size, reshuffle_each_iteration=True)
     dataset = dataset.repeat(EPOCHS)
     dataset = dataset.batch(batch_size)
