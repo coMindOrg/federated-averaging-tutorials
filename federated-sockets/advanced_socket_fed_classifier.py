@@ -102,7 +102,7 @@ with tf.name_scope('dataset'), tf.device('/cpu:0'):
 
     # Create dataset, shuffle, repeat, batch, map and prefetch
     dataset = tf.data.TFRecordDataset(filename_placeholder)
-    dataset = dataset.shard(federated_hoo.num_workers, federated_hook.task_index)
+    dataset = dataset.shard(federated_hook.num_workers, federated_hook.task_index)
     dataset = dataset.shuffle(shuffle_size, reshuffle_each_iteration=True)
     dataset = dataset.repeat(EPOCHS)
     dataset = dataset.batch(batch_size)
