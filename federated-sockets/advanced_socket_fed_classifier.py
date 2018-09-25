@@ -39,15 +39,8 @@ EPOCHS = 250
 EPOCHS_PER_DECAY = 50
 INTERVAL_STEPS = 100 # Steps between averages
 WAIT_TIME = 30 # How many seconds to wait for new workers to connect
+BATCHES_TO_PREFETCH = 1
 # -----------------
-
-# Dataset dependent constants
-num_train_images = int(50000 / num_workers)
-num_test_images = 10000
-height = 32
-width = 32
-channels = 3
-num_batch_files = 5
 
 # Set these IPs to your own, can leave as localhost for local testing
 CHIEF_PUBLIC_IP = 'localhost:7777' # Public IP of the chief worker
@@ -55,6 +48,14 @@ CHIEF_PRIVATE_IP = 'localhost:7777' # Private IP of the chief worker
 
 # Create the custom hook
 federated_hook = _FederatedHook(FLAGS.is_chief, CHIEF_PRIVATE_IP, CHIEF_PUBLIC_IP, WAIT_TIME, INTERVAL_STEPS)
+
+# Dataset dependent constants
+num_train_images = int(50000 / federated_hook.num_workers)
+num_test_images = 10000
+height = 32
+width = 32
+channels = 3
+num_batch_files = 5
 
 # Path to TFRecord files (check readme for instructions on how to get these files)
 cifar10_train_files = ['cifar-10-tf-records/train{}.tfrecords'.format(i) for i in range(num_batch_files)]
@@ -101,7 +102,7 @@ with tf.name_scope('dataset'), tf.device('/cpu:0'):
 
     # Create dataset, shuffle, repeat, batch, map and prefetch
     dataset = tf.data.TFRecordDataset(filename_placeholder)
-    dataset = dataset.shard(num_workers, FLAGS.task_index)
+    dataset = dataset.shard(federated_hoo.num_workers, federated_hook.task_index)
     dataset = dataset.shuffle(shuffle_size, reshuffle_each_iteration=True)
     dataset = dataset.repeat(EPOCHS)
     dataset = dataset.batch(batch_size)
