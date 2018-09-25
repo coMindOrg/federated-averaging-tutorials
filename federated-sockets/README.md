@@ -32,6 +32,8 @@ coMind has public Slack and Telegram channels which are a great place to ask que
 
 Check the [medium post](https://medium.com/comind/raspberry-pis-federated-learning-751b10fc92c9) to learn about port forwarding and how to set-up your chief host.
 
+Check [this script](https://github.com/tensorflow/models/blob/master/tutorials/image/cifar10_estimator/generate_cifar10_tfrecords.py) to see how to generate CIFAR-10 TFRecords.
+
 ## About
 
 coMind is an open source project for training privacy-preserving federated deep learning models. 
