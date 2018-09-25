@@ -57,6 +57,8 @@ sys.stdout.flush()
 
 global_step = tf.train.get_or_create_global_step()
 
+cpu_count = int(multiprocessing.cpu_count() / federated_hook.num_workers)
+
 # Define input pipeline, place these ops in the cpu
 with tf.name_scope('dataset'), tf.device('/cpu:0'):
     # Map function to decode data and preprocess it
