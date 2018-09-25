@@ -20,6 +20,8 @@ Check [this tutorial](https://lleksah.wordpress.com/2016/04/11/configuring-a-ras
 
 Check [this thread](https://raspberrypi.stackexchange.com/questions/54103/how-to-install-mpi4py-on-for-python3-on-raspberry-pi-after-installing-mpich) to solve common problems with mpi4py after installing mpich.
 
+Check [this script](https://github.com/tensorflow/models/blob/master/tutorials/image/cifar10_estimator/generate_cifar10_tfrecords.py) to see how to generate CIFAR-10 TFRecords.
+
 ## Troubleshooting and Help
 
 coMind has public Slack and Telegram channels which are a great place to ask questions and all things related to federated machine learning.
