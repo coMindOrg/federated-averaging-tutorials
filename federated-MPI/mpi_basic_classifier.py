@@ -208,7 +208,7 @@ class _FederatedHook(tf.train.SessionRunHook):
 # Hook to initialize the dataset
 class _InitHook(tf.train.SessionRunHook):
     def after_create_session(self, session, coord):
-        session.run(dataset_init_op, feed_dict={images_placeholder: train_images, labels_placeholder: train_labels, batch_size: BATCH_SIZE})
+        session.run(dataset_init_op, feed_dict={images_placeholder: train_images, labels_placeholder: train_labels, batch_size: BATCH_SIZE, shuffle_size: SHUFFLE_SIZE})
 
 print("Worker {} ready".format(comm.rank))
 sys.stdout.flush()
@@ -230,6 +230,6 @@ if comm.rank == 0:
         tf.train.Saver().restore(sess, ckpt.model_checkpoint_path)
         print('Model restored')
         sys.stdout.flush()
-        sess.run(dataset_init_op, feed_dict={images_placeholder: test_images, labels_placeholder: test_labels, batch_size: test_images.shape[0]})
+        sess.run(dataset_init_op, feed_dict={images_placeholder: test_images, labels_placeholder: test_labels, batch_size: test_images.shape[0], shuffle_size: 1})
         print('Test accuracy: {:4f}'.format(sess.run(accuracy)))
         sys.stdout.flush()
