@@ -8,7 +8,7 @@ You will need the custom `federated_averaging_optimizer.py` to be able to run th
 
 ## Usage
 
-For example, to run the keras_distributed_classifier.py`:
+For example, to run the `keras_distributed_classifier.py`:
 
 * 1st shell command should look like this: `python3 keras_distributed_classifier.py --job_name=ps --task_index=0`
 
