@@ -23,6 +23,7 @@ from tensorflow import keras
 from FederatedHook import _FederatedHook
 
 # Helper libraries
+import os
 import numpy as np
 from time import time
 
@@ -31,6 +32,8 @@ flags = tf.app.flags
 flags.DEFINE_boolean("is_chief", False, "True if this worker is chief")
 
 FLAGS = flags.FLAGS
+
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
 # You can safely tune these variables
 BATCH_SIZE = 32
@@ -64,7 +67,7 @@ print('Local dataset size: {}'.format(train_images.shape[0]))
 train_images = train_images / 255.0
 test_images = test_images / 255.0
 
-checkpoint_dir='logs_dir/{}'.format(time())
+CHECKPOINT_DIR = 'logs_dir/{}'.format(time())
 
 global_step = tf.train.get_or_create_global_step()
 
@@ -119,49 +122,62 @@ with tf.name_scope('train'):
     with tf.control_dependencies([loss_averages_op, accuracy_averages_op]):
         train_op = tf.train.AdamOptimizer(0.001).minimize(loss, global_step=global_step)
 
-sess_config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
+SESS_CONFIG = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
 
-n_batches = int(train_images.shape[0] / BATCH_SIZE)
-last_step = int(n_batches * EPOCHS)
+N_BATCHES = int(train_images.shape[0] / BATCH_SIZE)
+LAST_STEP = int(N_BATCHES * EPOCHS)
 
 # Logger hook to keep track of the training
 class _LoggerHook(tf.train.SessionRunHook):
-  def begin(self):
-      self._total_loss = 0
-      self._total_acc = 0
+    def begin(self):
+        """ Run this in session begin """
+        self._total_loss = 0
+        self._total_acc = 0
 
-  def before_run(self, run_context):
-      return tf.train.SessionRunArgs([loss, accuracy, global_step])
+    def before_run(self, run_context):
+        """ Run this in session before_run """
+        return tf.train.SessionRunArgs([loss, accuracy, global_step])
 
-  def after_run(self, run_context, run_values):
-      loss_value, acc_value, step_value = run_values.results
-      self._total_loss += loss_value
-      self._total_acc += acc_value
-      if (step_value + 1) % n_batches == 0:
-          print("Epoch {}/{} - loss: {:.4f} - acc: {:.4f}".format(int(step_value / n_batches) + 1, EPOCHS, self._total_loss / n_batches, self._total_acc / n_batches))
-          self._total_loss = 0
-          self._total_acc = 0
+    def after_run(self, run_context, run_values):
+        """ Run this in session after_run """
+        loss_value, acc_value, step_value = run_values.results
+        self._total_loss += loss_value
+        self._total_acc += acc_value
+        if (step_value + 1) % N_BATCHES == 0:
+            print("Epoch {}/{} - loss: {:.4f} - acc: {:.4f}".format(
+                int(step_value / N_BATCHES) + 1,
+                EPOCHS, self._total_loss / N_BATCHES,
+                self._total_acc / N_BATCHES))
+            self._total_loss = 0
+            self._total_acc = 0
 
-# Hook to initialize the dataset
 class _InitHook(tf.train.SessionRunHook):
+    """ Hook to initialize the dataset """
     def after_create_session(self, session, coord):
-        session.run(dataset_init_op, feed_dict={images_placeholder: train_images, labels_placeholder: train_labels, shuffle_size: SHUFFLE_SIZE, batch_size: BATCH_SIZE})
+        """ Run this after creating session """
+        session.run(dataset_init_op, feed_dict={
+            images_placeholder: train_images,
+            labels_placeholder: train_labels,
+            shuffle_size: SHUFFLE_SIZE, batch_size: BATCH_SIZE})
 
 print("Worker {} ready".format(federated_hook.task_index))
 
 with tf.name_scope('monitored_session'):
     with tf.train.MonitoredTrainingSession(
-            checkpoint_dir=checkpoint_dir,
+            checkpoint_dir=CHECKPOINT_DIR,
             hooks=[_LoggerHook(), _InitHook(), federated_hook],
-            config=sess_config,
-            save_checkpoint_steps=n_batches) as mon_sess:
+            config=SESS_CONFIG,
+            save_checkpoint_steps=N_BATCHES) as mon_sess:
         while not mon_sess.should_stop():
             mon_sess.run(train_op)
 
 print('--- Begin Evaluation ---')
 with tf.Session() as sess:
-    ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+    ckpt = tf.train.get_checkpoint_state(CHECKPOINT_DIR)
     tf.train.Saver().restore(sess, ckpt.model_checkpoint_path)
     print('Model restored')
-    sess.run(dataset_init_op, feed_dict={images_placeholder: test_images, labels_placeholder: test_labels, shuffle_size: 1, batch_size: test_images.shape[0]})
+    sess.run(dataset_init_op, feed_dict={
+        images_placeholder: test_images,
+        labels_placeholder: test_labels,
+        shuffle_size: 1, batch_size: test_images.shape[0]})
     print('Test accuracy: {:4f}'.format(sess.run(accuracy)))

@@ -1,17 +1,16 @@
-# TensorFlow and tf.keras
-import tensorflow as tf
-from tensorflow import keras
-
 # Helper libraries
 import os
 import numpy as np
 from time import time
+import sys
+import federated_averaging_optimizer
+
+# TensorFlow and tf.keras
+import tensorflow as tf
+from tensorflow import keras
 
 # Trick to import from parent directory
-import sys
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
-
-import federated_averaging_optimizer
 
 flags = tf.app.flags
 flags.DEFINE_integer("task_index", None,
@@ -47,7 +46,7 @@ ps_spec = FLAGS.ps_hosts.split(",")
 worker_spec = FLAGS.worker_hosts.split(",")
 
 # Get the number of workers.
-num_workers = len(worker_spec)
+NUM_WORKERS = len(worker_spec)
 
 cluster = tf.train.ClusterSpec({"ps": ps_spec, "worker": worker_spec})
 
@@ -60,31 +59,31 @@ if FLAGS.job_name == "ps":
 fashion_mnist = keras.datasets.fashion_mnist
 (train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
 
-class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
+CLASS_NAMES = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
                'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
 
 # Split dataset between workers
-train_images = np.array_split(train_images, num_workers)[FLAGS.task_index]
-train_labels = np.array_split(train_labels, num_workers)[FLAGS.task_index]
+train_images = np.array_split(train_images, NUM_WORKERS)[FLAGS.task_index]
+train_labels = np.array_split(train_labels, NUM_WORKERS)[FLAGS.task_index]
 print('Local dataset size: {}'.format(train_images.shape[0]))
 
 # Normalize dataset
 train_images = train_images / 255.0
 test_images = test_images / 255.0
 
-is_chief = (FLAGS.task_index == 0)
+IS_CHIEF = (FLAGS.task_index == 0)
 
 # We are not telling the MonitoredSession who is the chief so we need to
 # prevent non-chief workers from saving checkpoints or summaries.
-if is_chief:
-    checkpoint_dir = 'logs_dir/{}'.format(time())
+if IS_CHIEF:
+    CHECKPOINT_DIR = 'logs_dir/{}'.format(time())
 else:
-    checkpoint_dir = None
+    CHECKPOINT_DIR = None
 
-worker_device = "/job:worker/task:%d" % FLAGS.task_index
+WORKER_DEVICE = "/job:worker/task:%d" % FLAGS.task_index
 
 # Place all ops in the local worker by default
-with tf.device(worker_device):
+with tf.device(WORKER_DEVICE):
     global_step = tf.train.get_or_create_global_step()
 
     # Define the model
@@ -108,19 +107,22 @@ with tf.device(worker_device):
     with tf.name_scope('train'):
         # Define a device setter which will place a global copy of trainable variables
         # in the parameter server.
-        device_setter = tf.train.replica_device_setter(worker_device=worker_device, cluster=cluster)
+        device_setter = tf.train.replica_device_setter(worker_device=WORKER_DEVICE, cluster=cluster)
         # Define our custom optimizer
-        optimizer = federated_averaging_optimizer.FederatedAveragingOptimizer(tf.train.AdamOptimizer(0.001), replicas_to_aggregate=num_workers, interval_steps=INTERVAL_STEPS, is_chief=is_chief, device_setter=device_setter)
+        optimizer = federated_averaging_optimizer.FederatedAveragingOptimizer(
+            tf.train.AdamOptimizer(0.001),
+            replicas_to_aggregate=NUM_WORKERS, interval_steps=INTERVAL_STEPS,
+            is_chief=IS_CHIEF, device_setter=device_setter)
         train_op = optimizer.minimize(loss, global_step=global_step)
         # Define the hook which initializes the optimizer
         federated_average_hook = optimizer.make_session_run_hook()
 
     # ConfiProto for our session
-    sess_config = tf.ConfigProto(
+    SESS_CONFIG = tf.ConfigProto(
         allow_soft_placement=True,
         log_device_placement=False,
         device_filters=["/job:ps",
-        "/job:worker/task:%d" % FLAGS.task_index])
+                        "/job:worker/task:%d" % FLAGS.task_index])
 
     # We need to let the MonitoredSession initialize the variables
     keras.backend.manual_variable_initialization(True)
@@ -130,20 +132,22 @@ with tf.device(worker_device):
     # Hook to log training progress
     class _LoggerHook(tf.train.SessionRunHook):
         def before_run(self, run_context):
+            """ Run this in session before_run """
             return tf.train.SessionRunArgs(global_step)
 
         def after_run(self, run_context, run_values):
+            """ Run this in session after_run """
             step = run_values.results
             if step % 100 == 0:
                 print('Iter {}/{}'.format(step, FLAGS.train_steps))
 
     with tf.train.MonitoredTrainingSession(
-          master=server.target,
-          checkpoint_dir=checkpoint_dir,
-          hooks=[tf.train.StopAtStepHook(last_step=FLAGS.train_steps),
-                 _LoggerHook(), federated_average_hook],
-          save_checkpoint_steps=100,
-          config=sess_config) as mon_sess:
+            master=server.target,
+            checkpoint_dir=CHECKPOINT_DIR,
+            hooks=[tf.train.StopAtStepHook(last_step=FLAGS.train_steps),
+                   _LoggerHook(), federated_average_hook],
+            save_checkpoint_steps=100,
+            config=SESS_CONFIG) as mon_sess:
         keras.backend.set_session(mon_sess)
         while not mon_sess.should_stop():
-          mon_sess.run(train_op, feed_dict=train_feed)
+            mon_sess.run(train_op, feed_dict=train_feed)

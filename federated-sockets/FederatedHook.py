@@ -1,4 +1,4 @@
-# Copyright 2018 coMind. All Rights Reserved.
+"""# Copyright 2018 coMind. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,20 +13,22 @@
 # limitations under the License.
 #
 # https://comind.org/
-# ==============================================================================
+# =============================================================================="""
 
-import tensorflow as tf
-import numpy as np
 import socket
 import time
 import ssl
-from config import SSL_CONF, SEND_RECEIVE_CONF
+import hmac
+import tensorflow as tf
+import numpy as np
+from config import SSL_CONF as SC
+from config import SEND_RECEIVE_CONF as SRC
 
 try:
     import cPickle as pickle
 except ImportError:
     import pickle
-import hmac
+
 
 class _FederatedHook(tf.train.SessionRunHook):
     """Provides a hook to implemente federated averaging with tensorflow.
@@ -50,7 +52,8 @@ class _FederatedHook(tf.train.SessionRunHook):
 
       Remember if you training is not going to be performed in a LAN you will
       need to do some port forwarding, we recommend you to have a look to this
-      article we wrote about it: https://medium.com/comind/raspberry-pis-federated-learning-751b10fc92c9
+      article we wrote about it:
+      https://medium.com/comind/raspberry-pis-federated-learning-751b10fc92c9
 
       Once the training is going to start sends it's weights to the other workers,
       so that they all start with the same initial ones.
@@ -99,8 +102,6 @@ class _FederatedHook(tf.train.SessionRunHook):
           task_index (int): task index corresponding to this worker.
           num_workers (int): number of total workers.
          """
-        global SSL_CONF
-        SC = SSL_CONF
 
         if self._is_chief:
             self._server_socket = self._start_socket_server()
@@ -110,7 +111,7 @@ class _FederatedHook(tf.train.SessionRunHook):
 
             while time.time() < t_end:
                 try:
-                    sock, address = self._server_socket.accept()
+                    sock, _ = self._server_socket.accept()
                     connection_socket = ssl.wrap_socket(
                         sock,
                         server_side=True,
@@ -119,25 +120,29 @@ class _FederatedHook(tf.train.SessionRunHook):
                         ssl_version=ssl.PROTOCOL_TLSv1)
                     if connection_socket not in users:
                         users.append(connection_socket)
-                except Exception as e: pass
+                except socket.timeout:
+                    pass
 
             num_workers = len(users) + 1
-            [us.send((str(i+1) + ':' + str(num_workers)).encode('utf-8')) for i, us in enumerate(users)]
+            _ = [us.send((str(i+1) + ':' + str(num_workers)).encode('utf-8')) \
+            for i, us in enumerate(users)]
             self._nex_task_index = len(users) + 1
-            [us.close() for us in users]
+            _ = [us.close() for us in users]
 
             self._server_socket.settimeout(120)
             return 0, num_workers
-        else:
-            client_socket = self._start_socket_worker()
-            message = client_socket.recv(1024).decode('utf-8').split(':')
-            client_socket.close()
-            return int(message[0]), int(message[1])
+
+        client_socket = self._start_socket_worker()
+        message = client_socket.recv(1024).decode('utf-8').split(':')
+        client_socket.close()
+        return int(message[0]), int(message[1])
 
     def _create_placeholders(self):
         """Creates the placeholders that we will use to inject the weights into the graph"""
-        for v in tf.trainable_variables():
-            self._placeholders.append(tf.placeholder_with_default(v, v.shape, name="%s/%s" % ("FedAvg", v.op.name)))
+        for var in tf.trainable_variables():
+            self._placeholders.append(tf.placeholder_with_default(var, var.shape,
+                                                                  name="%s/%s" % ("FedAvg",
+                                                                                  var.op.name)))
 
     def _assign_vars(self, local_vars):
         """Utility to refresh local variables.
@@ -154,7 +159,8 @@ class _FederatedHook(tf.train.SessionRunHook):
             reassign_ops.append(tf.assign(var, fvar))
         return tf.group(*(reassign_ops))
 
-    def _receiving_subroutine(self, connection_socket):
+    @staticmethod
+    def _receiving_subroutine(connection_socket):
         """Subroutine inside _get_np_array to recieve a list of numpy arrays.
         If the sending was not correctly recieved it sends back an error message
         to the sender in order to try it again.
@@ -162,9 +168,6 @@ class _FederatedHook(tf.train.SessionRunHook):
           connection_socket (socket): a socket with a connection already
               established.
          """
-        global SEND_RECEIVE_CONF
-        SRC = SEND_RECEIVE_CONF
-
         timeout = 0.5
         while True:
             ultimate_buffer = b''
@@ -173,12 +176,13 @@ class _FederatedHook(tf.train.SessionRunHook):
             while True:
                 try:
                     receiving_buffer = connection_socket.recv(SRC.buffer)
-                except Exception as e:
+                except socket.timeout:
                     break
                 if first_round:
                     connection_socket.settimeout(timeout)
                     first_round = False
-                if not receiving_buffer: break
+                if not receiving_buffer:
+                    break
                 ultimate_buffer += receiving_buffer
 
             pos_signature = SRC.hashsize
@@ -201,23 +205,18 @@ class _FederatedHook(tf.train.SessionRunHook):
               connection_socket (socket): a socket with a connection already
                   established.
          """
-        global SEND_RECEIVE_CONF
-        SRC = SEND_RECEIVE_CONF
 
         message = self._receiving_subroutine(connection_socket)
-        final_image=pickle.loads(message)
+        final_image = pickle.loads(message)
         return final_image
 
-    def _send_np_array(self, arrays_to_send, connection_socket):
+    @staticmethod
+    def _send_np_array(arrays_to_send, connection_socket):
         """Routine to send a list of numpy arrays. It sends it as many time as necessary
             Args:
               connection_socket (socket): a socket with a connection already
                   established.
          """
-
-        global SEND_RECEIVE_CONF
-        SRC = SEND_RECEIVE_CONF
-
         serialized = pickle.dumps(arrays_to_send)
         signature = hmac.new(SRC.key, serialized, SRC.hashfunction).digest()
         assert len(signature) == SRC.hashsize
@@ -237,7 +236,7 @@ class _FederatedHook(tf.train.SessionRunHook):
             Returns:
               sever_socket (socket): ssl secured socket that will act as server.
          """
-        server_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1  # optional
@@ -260,6 +259,7 @@ class _FederatedHook(tf.train.SessionRunHook):
         return client_socket
 
     def begin(self):
+        """Session begin"""
         self._placeholders = []
         self._create_placeholders()
         self._update_local_vars_op = self._assign_vars(tf.trainable_variables())
@@ -276,10 +276,6 @@ class _FederatedHook(tf.train.SessionRunHook):
             Wait for the chief to send them its weights and inject them into
             the graph.
          """
-        global SEND_RECEIVE_CONF, SSL_CONF
-        SRC = SEND_RECEIVE_CONF
-        SC = SSL_CONF
-
         if self._is_chief:
             users = []
             addresses = []
@@ -295,7 +291,7 @@ class _FederatedHook(tf.train.SessionRunHook):
                         ssl_version=ssl.PROTOCOL_TLSv1)
 
                     print('Connected: ' + address[0] + ':' + str(address[1]))
-                except:
+                except socket.timeout:
                     print('Some workers could not connect')
                     break
                 try:
@@ -305,26 +301,28 @@ class _FederatedHook(tf.train.SessionRunHook):
                     users.append(connection_socket)
                     addresses.append(address)
                 except (ConnectionResetError, BrokenPipeError):
-                    print ('Could not send to : '
-                        + address[0] + ':' + str(address[1])
-                        + ', fallen worker')
+                    print('Could not send to : '
+                          + address[0] + ':' + str(address[1])
+                          + ', fallen worker')
                     connection_socket.close()
-            for i, us in enumerate(users):
+            for i, user in enumerate(users):
                 try:
-                    us.send(SRC.signal)
-                    us.close()
+                    user.send(SRC.signal)
+                    user.close()
                 except (ConnectionResetError, BrokenPipeError):
                     print('Fallen Worker: ' + addresses[i][0] + ':' + str(address[i][1]))
                     self.num_workers -= 1
-                    try: us.close()
-                    except: pass
+                    try:
+                        user.close()
+                    except (ConnectionResetError, BrokenPipeError):
+                        pass
         else:
             print('Starting Initialization')
             client_socket = self._start_socket_worker()
             broadcasted_weights = self._get_np_array(client_socket)
             feed_dict = {}
-            for ph, bw in zip(self._placeholders, broadcasted_weights):
-                feed_dict[ph] = bw
+            for placeh, brweigh in zip(self._placeholders, broadcasted_weights):
+                feed_dict[placeh] = brweigh
             session.run(self._update_local_vars_op, feed_dict=feed_dict)
             print('Initialization finished')
             client_socket.settimeout(120)
@@ -332,6 +330,7 @@ class _FederatedHook(tf.train.SessionRunHook):
             client_socket.close()
 
     def before_run(self, run_context):
+        """ Session before_run"""
         return tf.train.SessionRunArgs(self._global_step)
 
     def after_run(self, run_context, run_values):
@@ -349,9 +348,6 @@ class _FederatedHook(tf.train.SessionRunHook):
             Wait for the chief to send them the averaged weights and inject them into
             their graph.
          """
-        global SSL_CONF
-        SC = SSL_CONF
-
         step_value = run_values.results
         session = run_context.session
         if step_value % self._interval_steps == 0 and not step_value == 0:
@@ -372,7 +368,7 @@ class _FederatedHook(tf.train.SessionRunHook):
                             ssl_version=ssl.PROTOCOL_TLSv1)
 
                         print('Connected: ' + address[0] + ':' + str(address[1]))
-                    except:
+                    except socket.timeout:
                         print('Some workers could not connect')
                         break
                     try:
@@ -380,16 +376,17 @@ class _FederatedHook(tf.train.SessionRunHook):
                         gathered_weights.append(recieved)
                         users.append(connection_socket)
                         addresses.append(address)
-                        print ('Received from ' + address[0] + ':' + str(address[1]))
+                        print('Received from ' + address[0] + ':' + str(address[1]))
                     except (ConnectionResetError, BrokenPipeError):
-                        print ('Could not recieve from : '
-                            + address[0] + ':' + str(address[1])
-                            + ', fallen worker')
+                        print('Could not recieve from : '
+                              + address[0] + ':' + str(address[1])
+                              + ', fallen worker')
                         connection_socket.close()
 
                 self.num_workers = len(users) + 1
 
-                print('Average applied with {} workers, iter: {}'.format(self.num_workers, step_value))
+                print('Average applied '
+                      + 'with {} workers, iter: {}'.format(self.num_workers, step_value))
                 rearranged_weights = []
 
                 #In gathered_weights, each list represents the weights of each worker.
@@ -397,22 +394,24 @@ class _FederatedHook(tf.train.SessionRunHook):
                 #to average them afterwards
                 for i in range(len(gathered_weights[0])):
                     rearranged_weights.append([elem[i] for elem in gathered_weights])
-                for i in range(len(rearranged_weights)):
-                    rearranged_weights[i] = np.mean(rearranged_weights[i], axis=0)
+                for i, elem in enumerate(rearranged_weights):
+                    rearranged_weights[i] = np.mean(elem, axis=0)
 
-                for i, us in enumerate(users):
+                for i, user in enumerate(users):
                     try:
-                        self._send_np_array(rearranged_weights, us)
-                        us.close()
+                        self._send_np_array(rearranged_weights, user)
+                        user.close()
                     except (ConnectionResetError, BrokenPipeError):
                         print('Fallen Worker: ' + addresses[i][0] + ':' + str(address[i][1]))
                         self.num_workers -= 1
-                        try: us.close()
-                        except: pass
+                        try:
+                            user.close()
+                        except socket.timeout:
+                            pass
 
                 feed_dict = {}
-                for ph, rw in zip(self._placeholders, rearranged_weights):
-                    feed_dict[ph] = rw
+                for placeh, reweigh in zip(self._placeholders, rearranged_weights):
+                    feed_dict[placeh] = reweigh
                 session.run(self._update_local_vars_op, feed_dict=feed_dict)
 
             else:
@@ -423,12 +422,13 @@ class _FederatedHook(tf.train.SessionRunHook):
 
                 broadcasted_weights = self._get_np_array(worker_socket)
                 feed_dict = {}
-                for ph, bw in zip(self._placeholders, broadcasted_weights):
-                    feed_dict[ph] = bw
+                for placeh, brweigh in zip(self._placeholders, broadcasted_weights):
+                    feed_dict[placeh] = brweigh
                 session.run(self._update_local_vars_op, feed_dict=feed_dict)
                 print('Weights succesfully updated, iter: {}'.format(step_value))
                 worker_socket.close()
 
     def end(self, session):
-            if self._is_chief:
-                self.server_socket.close()
+        """ Session end """
+        if self._is_chief:
+            self._server_socket.close()

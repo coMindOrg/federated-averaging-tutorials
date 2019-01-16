@@ -50,27 +50,27 @@ CHIEF_PRIVATE_IP = 'localhost:7777' # Private IP of the chief worker
 federated_hook = _FederatedHook(FLAGS.is_chief, CHIEF_PRIVATE_IP, CHIEF_PUBLIC_IP, WAIT_TIME, INTERVAL_STEPS)
 
 # Dataset dependent constants
-num_train_images = int(50000 / federated_hook.num_workers)
-num_test_images = 10000
-height = 32
-width = 32
-channels = 3
-num_batch_files = 5
+NUM_TRAIN_IMAGES = int(50000 / federated_hook.num_workers)
+NUM_TEST_IMAGES = 10000
+HEIGHT = 32
+WIDTH = 32
+CHANNELS = 3
+NUM_BATCH_FILES = 5
 
 # Path to TFRecord files (check readme for instructions on how to get these files)
-cifar10_train_files = ['cifar-10-tf-records/train{}.tfrecords'.format(i) for i in range(num_batch_files)]
+cifar10_train_files = ['cifar-10-tf-records/train{}.tfrecords'.format(i) for i in range(NUM_BATCH_FILES)]
 cifar10_test_file = 'cifar-10-tf-records/test.tfrecords'
 
 # Shuffle filenames before loading them
 np.random.shuffle(cifar10_train_files)
 
-checkpoint_dir='logs_dir/{}'.format(time())
-print('Checkpoint directory: ' + checkpoint_dir)
+CHECKPOINT_DIR = 'logs_dir/{}'.format(time())
+print('Checkpoint directory: ' + CHECKPOINT_DIR)
 
 global_step = tf.train.get_or_create_global_step()
 
 # Check number of available CPUs
-cpu_count = int(multiprocessing.cpu_count() / federated_hook.num_workers)
+CPU_COUNT = int(multiprocessing.cpu_count() / federated_hook.num_workers)
 
 # Define input pipeline, place these ops in the cpu
 with tf.name_scope('dataset'), tf.device('/cpu:0'):
@@ -79,20 +79,22 @@ with tf.name_scope('dataset'), tf.device('/cpu:0'):
         # Parse a batch
         features = tf.parse_example(serialized_examples, {'image': tf.FixedLenFeature([], tf.string), 'label': tf.FixedLenFeature([], tf.int64)})
         # Decode and reshape imag
-        image = tf.map_fn(lambda img: tf.reshape(tf.decode_raw(img, tf.uint8), tf.stack([height, width, channels])), features['image'], dtype=tf.uint8, name='decode')
+        image = tf.map_fn(lambda img: tf.reshape(tf.decode_raw(img, tf.uint8), tf.stack([HEIGHT, WIDTH, CHANNELS])), features['image'], dtype=tf.uint8, name='decode')
         # Cast image
         casted_image = tf.cast(image, tf.float32, name='input_cast')
         # Resize image for testing
         resized_image = tf.image.resize_image_with_crop_or_pad(casted_image, 24, 24)
         # Augment images for training
-        distorted_image = tf.map_fn(lambda img: tf.random_crop(img, [24, 24, 3]), casted_image, name='random_crop')
+        distorted_image = tf.map_fn(lambda img: tf.random_crop(img, [24, 24, 3]),
+                                    casted_image, name='random_crop')
         distorted_image = tf.image.random_flip_left_right(distorted_image)
         distorted_image = tf.image.random_brightness(distorted_image, 63)
         distorted_image = tf.image.random_contrast(distorted_image, 0.2, 1.8)
         # Check if test or train mode
         result = tf.cond(train_mode, lambda: distorted_image, lambda: resized_image)
         # Standardize images
-        processed_image = tf.map_fn(lambda img: tf.image.per_image_standardization(img), result, name='standardization')
+        processed_image = tf.map_fn(lambda img: tf.image.per_image_standardization(img),
+                                    result, name='standardization')
         return processed_image, features['label']
     # Placeholders for the iterator
     filename_placeholder = tf.placeholder(tf.string, name='input_filename')
@@ -106,7 +108,7 @@ with tf.name_scope('dataset'), tf.device('/cpu:0'):
     dataset = dataset.shuffle(shuffle_size, reshuffle_each_iteration=True)
     dataset = dataset.repeat(EPOCHS)
     dataset = dataset.batch(batch_size)
-    dataset = dataset.map(preprocess, cpu_count)
+    dataset = dataset.map(preprocess, CPU_COUNT)
     dataset = dataset.prefetch(BATCHES_TO_PREFETCH)
     # Define a feedable iterator and the initialization op
     iterator = tf.data.Iterator.from_structure(dataset.output_types, dataset.output_shapes)
@@ -157,8 +159,8 @@ with tf.name_scope('accuracy'):
     # Store moving average of the accuracy
     tf.summary.scalar('accuracy', summary_averages.average(accuracy))
 
-n_batches = int(num_train_images / BATCH_SIZE)
-last_step = int(n_batches * EPOCHS)
+N_BATCHES = int(NUM_TRAIN_IMAGES / BATCH_SIZE)
+LAST_STEP = int(N_BATCHES * EPOCHS)
 
 # Define moving averages of the trainable variables. This sometimes improve
 # the performance of the trained mode
@@ -169,7 +171,7 @@ with tf.name_scope('variable_averages'):
 # Define optimizer and training op
 with tf.name_scope('train'):
     # Make decaying learning rate
-    lr = tf.train.exponential_decay(0.1, global_step, n_batches * EPOCHS_PER_DECAY, 0.1, staircase=True)
+    lr = tf.train.exponential_decay(0.1, global_step, N_BATCHES * EPOCHS_PER_DECAY, 0.1, staircase=True)
     tf.summary.scalar('learning_rate', lr)
     # Make train_op dependent on moving averages ops. Otherwise they will be
     # disconnected from the graph
@@ -179,35 +181,47 @@ with tf.name_scope('train'):
 print('Graph definition finished')
 sess_config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
 
-print('Training {} batches...'.format(last_step))
+print('Training {} batches...'.format(LAST_STEP))
 
 # Logger hook to keep track of the training
 class _LoggerHook(tf.train.SessionRunHook):
-  def begin(self):
-      self._total_loss = 0
-      self._total_acc = 0
+    def begin(self):
+        """ Run this in session begin """
+        self._total_loss = 0
+        self._total_acc = 0
 
-  def before_run(self, run_context):
-      return tf.train.SessionRunArgs([loss, accuracy, global_step])
+    def before_run(self, run_context):
+        """ Run this in session before_run """
+        return tf.train.SessionRunArgs([loss, accuracy, global_step])
 
-  def after_run(self, run_context, run_values):
-      loss_value, acc_value, step_value = run_values.results
-      self._total_loss += loss_value
-      self._total_acc += acc_value
-      if (step_value + 1) % n_batches == 0:
-          print("Epoch {}/{} - loss: {:.4f} - acc: {:.4f}".format(int(step_value / n_batches) + 1, EPOCHS, self._total_loss / n_batches, self._total_acc / n_batches))
-          self._total_loss = 0
-          self._total_acc = 0
+    def after_run(self, run_context, run_values):
+        """ Run this in session after_run """
+        loss_value, acc_value, step_value = run_values.results
+        self._total_loss += loss_value
+        self._total_acc += acc_value
+        if (step_value + 1) % N_BATCHES == 0:
+            print("Epoch {}/{} - loss: {:.4f} - acc: {:.4f}".format(
+                int(step_value / N_BATCHES) + 1,
+                EPOCHS, self._total_loss / N_BATCHES, self._total_acc / N_BATCHES))
+            self._total_loss = 0
+            self._total_acc = 0
 
 # Hook to initialize the dataset
 class _InitHook(tf.train.SessionRunHook):
     def after_create_session(self, session, coord):
-        session.run(dataset_init_op, feed_dict={filename_placeholder: cifar10_train_files, batch_size: BATCH_SIZE, shuffle_size: SHUFFLE_SIZE, train_mode: True})
+        """ Run this after creating session """
+        session.run(dataset_init_op, feed_dict={
+            filename_placeholder: cifar10_train_files,
+            batch_size: BATCH_SIZE, shuffle_size: SHUFFLE_SIZE, train_mode: True})
 
 with tf.name_scope('monitored_session'):
     with tf.train.MonitoredTrainingSession(
-            checkpoint_dir=checkpoint_dir,
-            hooks=[_LoggerHook(), _InitHook(), federated_hook, tf.train.CheckpointSaverHook(checkpoint_dir=checkpoint_dir, save_steps=n_batches, saver=tf.train.Saver(variable_averages.variables_to_restore()))],
+            checkpoint_dir=CHECKPOINT_DIR,
+            hooks=[_LoggerHook(), _InitHook(), federated_hook,
+                   tf.train.CheckpointSaverHook(checkpoint_dir=CHECKPOINT_DIR,
+                                                save_steps=N_BATCHES,
+                                                saver=tf.train.Saver(
+                                                    variable_averages.variables_to_restore()))],
             config=sess_config,
             save_checkpoint_secs=None) as mon_sess:
         while not mon_sess.should_stop():
@@ -217,7 +231,7 @@ print('--- Begin Evaluation ---')
 # Reset graph to clear any ops stored in other devices
 tf.reset_default_graph()
 with tf.Session() as sess:
-    ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+    ckpt = tf.train.get_checkpoint_state(CHECKPOINT_DIR)
     saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path + '.meta', clear_devices=True)
     saver.restore(sess, ckpt.model_checkpoint_path)
     print('Model restored')
@@ -228,5 +242,5 @@ with tf.Session() as sess:
     train_mode = graph.get_tensor_by_name('dataset/train_mode:0')
     accuracy = graph.get_tensor_by_name('accuracy/accuracy_metric:0')
     dataset_init_op = graph.get_operation_by_name('dataset/dataset_init')
-    sess.run(dataset_init_op, feed_dict={filename_placeholder: cifar10_test_file, batch_size: num_test_images, shuffle_size: 1, train_mode: False})
+    sess.run(dataset_init_op, feed_dict={filename_placeholder: cifar10_test_file, batch_size: NUM_TEST_IMAGES, shuffle_size: 1, train_mode: False})
     print('Test accuracy: {:4f}'.format(sess.run(accuracy)))
