@@ -1,6 +1,6 @@
 # coMind: Collaborative Machine Learning
 
-For over a year we have been working in the intersection of machine learning and blockchain. This has led us to do extensive research in distributed machine learning algorithms. Federated averaging has a set of features that makes it perfect to train models in a collaborative way while preserving the privacy of sensitive data. In this repository you can learn how to start training ML models in a federated setup.
+For over two years we have been working on privacy related technologies. This has led us to do extensive research in distributed machine learning algorithms. Federated averaging has a set of features that makes it perfect to train models in a collaborative way while preserving the privacy of sensitive data. In this repository you can learn how to start training ML models in a federated setup.
 
 <img src="https://raw.githubusercontent.com/coMindOrg/federated-averaging-tutorials/master/images/comindorg_logo.png" alt="drawing" width="300"/>
 
