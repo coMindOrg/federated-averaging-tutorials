@@ -1,8 +1,14 @@
-# coMind: Collaborative Machine Learning
+# coMind: is Acuratio's open source project.
 
-For over two years we have been working on privacy related technologies. This has led us to do extensive research in distributed machine learning algorithms. Federated averaging has a set of features that makes it perfect to train models in a collaborative way while preserving the privacy of sensitive data. In this repository you can learn how to start training ML models in a federated setup.
+[<img src="https://raw.githubusercontent.com/coMindOrg/federated-averaging-tutorials/master/images/Logo_Acuratio.png" alt="Acuratio_Logo" width="170"/>](https://acuratio.com)
 
-<img src="https://raw.githubusercontent.com/coMindOrg/federated-averaging-tutorials/master/images/comindorg_logo.png" alt="drawing" width="300"/>
+Check out our Multicloud Platform at [acuratio.com](https://acuratio.com)
+
+This library is depecrated, contact us at hello@acuratio.com. Let us know what's your problem or use case and we'll get in touch with a privacy preserving solution.
+
+Federated averaging has a set of features that makes it perfect to train models in a collaborative way while preserving the privacy of sensitive data. In this repository you can learn how to start training ML models in a federated setup.
+
+<img src="https://raw.githubusercontent.com/coMindOrg/federated-averaging-tutorials/master/images/comindorg_logo.png" alt="drawing" width="150"/>
 
 ## What can you expect to find here.
 
